@@ -191,6 +191,14 @@ select.cell option { background: var(--bg3); color: var(--text); }
   .oee-grid { grid-template-columns: repeat(3, 1fr); }
   .summary-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* Impressão do Resumo Executivo: esconde navegação/menus e mostra só o conteúdo do resumo */
+@media print {
+  body * { visibility: hidden; }
+  #sec-resumo, #sec-resumo * { visibility: visible; }
+  #sec-resumo { position: absolute; left: 0; top: 0; width: 100%; }
+  .no-print { display: none !important; }
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -294,8 +302,10 @@ select.cell option { background: var(--bg3); color: var(--text); }
     <div class="nav-tab" onclick="showSection(&#39;comparativo&#39;, this)">Comparativo</div>
     <div class="nav-tab" onclick="showSection(&#39;periodo&#39;, this)">Visão por Período</div>
     <div class="nav-tab" onclick="showSection(&#39;oee&#39;, this)">OEE por Equipamento</div>
-    <div class="nav-tab" onclick="showSection(&#39;descarte&#39;, this)">Descarte de Insumos</div>
+    <div class="nav-tab" onclick="showSection(&#39;descarte&#39;, this)">Descarte de Insumos<span id="descPendBadge" style="display:none;margin-left:6px;background:#f5a623;color:#1a1a1a;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px"></span></div>
     <div class="nav-tab active" onclick="showSection(&#39;planilha&#39;, this)">Editar Dados</div>
+    <div class="nav-tab" onclick="showSection(&#39;resumo&#39;, this)">Resumo Executivo</div>
+    <div class="nav-tab" id="navAuditoria" onclick="showSection(&#39;auditoria&#39;, this)" style="display:none">Auditoria</div>
   </div>
   <div class="nav-badge" id="navBadge">Jan/26–Jun/26 · 16 lotes · 349.742 un.</div>
 </nav>
@@ -465,12 +475,18 @@ select.cell option { background: var(--bg3); color: var(--text); }
 
   <div class="chart-row cols2">
     <div class="chart-panel">
-      <div class="chart-title" id="compVolTitle">Volume produzido por lote</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title" id="compVolTitle">Volume produzido por lote</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarComparativoCSV('vol')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Planejado × Realizado por lote</div>
       <div class="chart-wrap" style="height:320px"><canvas id="chartCompVol" role="img" aria-label="Volume planejado versus produzido por lote" style="box-sizing: border-box; display: block; height: 320px; width: 626px;" width="626" height="320"></canvas></div>
     </div>
     <div class="chart-panel">
-      <div class="chart-title" id="compDescTitle">Descarte por lote (unidades)</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title" id="compDescTitle">Descarte por lote (unidades)</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarComparativoCSV('desc')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Unidades descartadas em cada lote</div>
       <div class="chart-wrap" style="height:320px"><canvas id="chartCompDesc" role="img" aria-label="Unidades descartadas por lote" style="box-sizing: border-box; display: block; height: 320px; width: 626px;" width="626" height="320"></canvas></div>
     </div>
@@ -478,12 +494,18 @@ select.cell option { background: var(--bg3); color: var(--text); }
 
   <div class="chart-row cols2">
     <div class="chart-panel">
-      <div class="chart-title" id="compTempoTitle">Tempo real Etapa 4 Ajustada por lote (h)</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title" id="compTempoTitle">Tempo real Etapa 4 Ajustada por lote (h)</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarComparativoCSV('tempo')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Tempo estimado vs. tempo real ajustado por lote</div>
       <div class="chart-wrap" style="height:280px"><canvas id="chartCompTempo" role="img" aria-label="Tempo real da etapa 4 ajustada por lote" style="box-sizing: border-box; display: block; height: 280px; width: 626px;" width="626" height="280"></canvas></div>
     </div>
     <div class="chart-panel">
-      <div class="chart-title" id="compPNPTitle">Paradas não planejadas registradas (h)</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title" id="compPNPTitle">Paradas não planejadas registradas (h)</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarComparativoCSV('pnp')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Disponível apenas para lotes com PNP preenchido</div>
       <div class="chart-wrap" style="height:280px"><canvas id="chartCompPNP" role="img" aria-label="Paradas não planejadas por lote" style="box-sizing: border-box; display: block; height: 280px; width: 626px;" width="626" height="280"></canvas></div>
     </div>
@@ -861,6 +883,9 @@ select.cell option { background: var(--bg3); color: var(--text); }
     <select id="descAteAno" onchange="buildDescarte()" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;width:70px"></select>
   </div>
 
+  <!-- Alertas de faixa de referência -->
+  <div id="descAlertas"></div>
+
   <!-- Gráficos por insumo -->
   <div id="descarteCharts" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:20px"></div>
 </div>
@@ -1228,6 +1253,32 @@ select.cell option { background: var(--bg3); color: var(--text); }
       3. Para remover um lote, clique no botão ✕ no final da linha correspondente.<br>
       4. Clique em "↻ Atualizar Dashboard" para recalcular automaticamente: KPIs por lote, comparativo entre lotes, visão mensal, visão trimestral e OEE por equipamento.<br>
       5. <strong>Importante:</strong> as alterações só existem na página aberta. Para não perdê-las ao fechar, clique em "💾 Baixar HTML Atualizado" — isso baixa um novo arquivo .html já com seus dados gravados dentro dele. Salve por cima do arquivo antigo (mesmo nome e local) para continuar editando esse mesmo dashboard da próxima vez.
+    </div>
+  </div>
+</div>
+
+<div id="sec-resumo" class="section">
+  <div class="page-header">
+    <div class="page-title">Resumo Executivo</div>
+    <div class="page-sub">Visão consolidada de todos os lotes — pronta para impressão ou envio por e-mail</div>
+  </div>
+  <div class="no-print" style="display:flex;justify-content:flex-end;margin-bottom:16px">
+    <button type="button" class="lote-btn" onclick="window.print()">🖨️ Imprimir / Exportar PDF</button>
+  </div>
+  <div id="resumoConteudo"></div>
+</div>
+
+<div id="sec-auditoria" class="section">
+  <div class="page-header">
+    <div class="page-title">Auditoria — Histórico de Edições</div>
+    <div class="page-sub">Registro de quem alterou cada lote e quando · visível apenas para o administrador</div>
+  </div>
+  <div class="chart-panel">
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr><th>Data/Hora</th><th>Lote</th><th>Resumo</th></tr></thead>
+        <tbody id="auditoriaTable"><tr><td colspan="3" style="text-align:center;color:var(--text3);padding:24px">—</td></tr></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -1614,6 +1665,8 @@ function showSection(name, el) {
   if(name==='periodo') buildVisaoPeriodo();
   if(name==='oee') buildOEE();
   if(name==='descarte') buildDescarte();
+  if(name==='resumo') buildResumoExecutivo();
+  if(name==='auditoria') carregarAuditoria();
 }
 
 function updateNavBadge() {
@@ -1666,6 +1719,11 @@ function renderLote(l) {
     <div class="kpi-card"><div class="kpi-label">OEE Rotuladora 1</div><div class="kpi-value ${oeeClass(oee?.rot1)}">${oee ? fPct(oee.rot1*100) : 'N/D'}</div><div class="kpi-sub">Meta: 85%</div></div>
     <div class="kpi-card"><div class="kpi-label">Desvios Abertos</div><div class="kpi-value ${l.desvAb===0?'good':'bad'}">${l.desvAb}</div><div class="kpi-sub">Em atraso: ${l.desvAtras}</div></div>
   </div>
+
+  ${l.obs ? `<div class="chart-panel" style="margin-bottom:20px;border-color:var(--border2)">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;color:var(--text2);font-weight:600">📝 Observações</div>
+    <div style="font-size:13px;color:var(--text);white-space:pre-wrap">${l.obs.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+  </div>` : ''}
 
   ${oee ? `<div class="oee-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px">
     ${[['Rotuladora 1',oee.rot1],['Rotuladora 2',oee.rot2],['Esteira',oee.esteira],['BLA',oee.bla],['Unitizadora',oee.unit]].map(([nm,v])=>`
@@ -1743,6 +1801,7 @@ function renderLote(l) {
 // ═══════════════════════════════════════════════════════════════════
 let compFiltroConc = 'all';
 let compGranularidade = 'lote'; // 'lote' | 'mensal' | 'trimestral' | 'semestral'
+let COMPARATIVO_CACHE = { itens: [] }; // usado pela exportação CSV dos gráficos do Comparativo
 
 function compFiltroConcClick(el) {
   document.querySelectorAll('#compFiltroConc .lote-btn').forEach(b => b.classList.remove('active'));
@@ -1858,6 +1917,37 @@ function agregarLotesComparativo(lotesFiltrados) {
   }));
 }
 
+// Exporta os dados de um dos 4 gráficos do Comparativo em CSV
+function exportarComparativoCSV(chave) {
+  const itens = COMPARATIVO_CACHE.itens || [];
+  if (!itens.length) return;
+  const gran = COMPARATIVO_CACHE.granularidade || 'lote';
+  const rotuloCol = gran === 'lote' ? 'Lote' : 'Período';
+
+  const specs = {
+    vol:   { arquivo: 'comparativo_volume',  cab: [rotuloCol, 'Planejado', 'Produzido'], linha: x => [x.label, x.plan, x.prod] },
+    desc:  { arquivo: 'comparativo_descarte', cab: [rotuloCol, 'Descarte (un.)', '% Descarte'], linha: x => [x.label, x.desc, x.descPct.toFixed(4).replace('.', ',')] },
+    tempo: { arquivo: 'comparativo_tempo',    cab: [rotuloCol, 'T.Est E4 (h)', 'T.Real E4adj (h)'], linha: x => [x.label, x.tEstE4.toFixed(2).replace('.', ','), x.tRealE4a.toFixed(2).replace('.', ',')] },
+    pnp:   { arquivo: 'comparativo_pnp',      cab: [rotuloCol, 'PNP (h)'], linha: x => [x.label, x.pnp !== null ? x.pnp.toFixed(2).replace('.', ',') : ''] },
+  };
+  const spec = specs[chave];
+  if (!spec) return;
+
+  const dados = chave === 'pnp' ? itens.filter(x => x.pnp !== null) : itens;
+  const linhas = [spec.cab, ...dados.map(spec.linha)];
+  const csv = linhas.map(l => l.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${spec.arquivo}_${gran}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  if (typeof showToast === 'function') showToast('💾 CSV exportado');
+}
+
 function buildComparativo() {
   const META_LOTES_ANO = 43;
 
@@ -1866,6 +1956,7 @@ function buildComparativo() {
   // Nenhum lote bate com os filtros (concentração/período) — mostra aviso claro em vez
   // de gráficos vazios sem explicação, e para por aqui.
   if (!lotesFiltrados.length) {
+    COMPARATIVO_CACHE = { itens: [] };
     ['sumProd','sumPlan','sumDesc','sumPct'].forEach(id => {
       const el = document.getElementById(id); if (el) el.textContent = '—';
     });
@@ -1893,7 +1984,8 @@ function buildComparativo() {
       descPct: l.plan ? l.desc/l.plan*100 : 0,
       tEstE4: l.tEstE4, tRealE4a: l.tRealE4a,
       pnp: (l.pnp !== null && l.pnp !== undefined) ? l.pnp : null,
-      oeeRot1: (l.oee && l.oee.rot1 !== null && l.oee.rot1 !== undefined) ? l.oee.rot1 : null
+      oeeRot1: (l.oee && l.oee.rot1 !== null && l.oee.rot1 !== undefined) ? l.oee.rot1 : null,
+      obs: l.obs || ''
     }));
   } else {
     const grupos = agregarLotesComparativo(lotesFiltrados);
@@ -1903,9 +1995,12 @@ function buildComparativo() {
       diasTxt: String(g.nLotes),
       nLotes: g.nLotes,
       plan: g.plan, prod: g.prod, desc: g.desc, descPct: g.descPct,
-      tEstE4: g.tEstE4, tRealE4a: g.tRealE4a, pnp: g.pnp, oeeRot1: g.oeeRot1
+      tEstE4: g.tEstE4, tRealE4a: g.tRealE4a, pnp: g.pnp, oeeRot1: g.oeeRot1,
+      obs: '' // observações não fazem sentido agregadas por período
     }));
   }
+
+  COMPARATIVO_CACHE = { itens, granularidade: compGranularidade };
 
   const granLabel = { lote:'lote', mensal:'mês', trimestral:'trimestre', semestral:'semestre' }[compGranularidade];
   const colDiasLabel = compGranularidade === 'lote' ? 'Dias' : 'Nº Lotes';
@@ -2115,7 +2210,7 @@ function buildComparativo() {
   itens.forEach(x => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><strong>${x.label}</strong></td>
+      <td><strong>${x.label}</strong>${x.obs ? ` <span title="${x.obs.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}" style="cursor:help">📝</span>` : ''}</td>
       <td style="color:var(--text2)">${x.perTxt}</td>
       <td style="text-align:center">${x.diasTxt}</td>
       <td style="text-align:right">${fNum(x.plan)}</td>
@@ -2426,6 +2521,7 @@ function sheetRow(l, idx) {
   tr.dataset.idx = idx;
   const oee = l.oee || {rot1:'',rot2:'',esteira:'',bla:'',unit:''};
   const pct = v => v===''||v===null||v===undefined ? '' : (v*100).toFixed(1);
+  const escHtml = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const ins = l.insumos || (() => {
     // fallback: busca nos dados históricos hardcoded
     const found = INSUMOS_DATA.find(d => d.lote === l.id);
@@ -2498,6 +2594,11 @@ function sheetRow(l, idx) {
         </div>
         <div style="width:1px;background:var(--border);align-self:stretch;margin:0 4px"></div>
         ${insFields}
+        <div style="width:1px;background:var(--border);align-self:stretch;margin:0 4px"></div>
+        <div class="ins-field" style="flex:1;min-width:240px">
+          <span class="ins-label">Observações / causa-raiz</span>
+          <textarea class="cell f-obs" rows="1" placeholder="Ex.: parada por manutenção corretiva na rotuladora 2" style="min-width:0;width:100%;resize:vertical;font-family:inherit;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px">${escHtml(l.obs)}</textarea>
+        </div>
         <div style="align-self:flex-end;margin-left:4px;font-size:10px;color:var(--text3)">Descarte por insumo (un.)</div>
       </div>
     </td>`;
@@ -2662,6 +2763,7 @@ function applyChanges() {
     const conc = vi('f-conc') || '';
     const opRaw = vi('f-op');
     const op = opRaw === '' ? null : +opRaw;
+    const obs = (vi('f-obs') || '').trim();
     const insumos = {};
     INSUMOS_META.forEach(ins_ => {
       const raw = vi('f-ins-' + ins_.key);
@@ -2699,8 +2801,19 @@ function applyChanges() {
     }
 
     novosLotes.push({ id, per, mes, q, dias, plan, prod, desc, tEstE4, tRealE4a, pnp, oee, desvAb, desvAtras, diarios,
-      conc, op, insumos: hasInsumos ? insumos : null });
+      conc, op, insumos: hasInsumos ? insumos : null, obs: obs || undefined });
   });
+
+  // Detecta quais lotes são novos ou tiveram algum campo alterado, para o registro
+  // de auditoria (aplicado só quando o usuário logado é o e-mail autorizado — ver registrarAuditoria)
+  const loteIdsAlterados = novosLotes
+    .filter(novo => {
+      const antigo = LOTES.find(l => l.id === novo.id);
+      if (!antigo) return true; // lote novo
+      return JSON.stringify(antigo) !== JSON.stringify(novo);
+    })
+    .map(l => l.id)
+    .filter(Boolean);
 
   LOTES = novosLotes;
   sortLotesCronologico();
@@ -2709,6 +2822,7 @@ function applyChanges() {
   // Apenas atualiza os gráficos e salva no Supabase
   rebuildDashboard();
   salvarLotesSupabase();
+  registrarAuditoria(loteIdsAlterados);
 }
 
 function baixarHTMLAtualizado() {
@@ -3025,9 +3139,12 @@ function buildDescarte() {
   if (!container) return;
   container.innerHTML = '';
   DESCARTE_CACHE = {};
+  const alertasFaixa = [];
 
   if (!itens.length) {
     container.innerHTML = '<div style="color:var(--text3);padding:32px;text-align:center;grid-column:1/-1">Nenhum lote encontrado para os filtros selecionados.</div>';
+    const alertElVazio = document.getElementById('descAlertas');
+    if (alertElVazio) alertElVazio.innerHTML = '';
     return;
   }
 
@@ -3039,6 +3156,15 @@ function buildDescarte() {
     const bordas = pcts.map(p => p===null?'#555':                  p>5?'#ef4444':               p>1?'#f5a623':               p>0?'#4f8ef7':               '#22d496');
     const tendencia = calcularTendencia(pcts);
     const media = calcularMedia(pcts);
+
+    // Alerta: pontos fora da faixa de referência configurada para este insumo
+    if (ins.refMin != null && ins.refMax != null) {
+      plot.forEach(p => {
+        if (p.pct !== null && (p.pct < ins.refMin || p.pct > ins.refMax)) {
+          alertasFaixa.push({ insumoKey: ins.key, insumoLabel: ins.label, label: p.label, pct: p.pct, refMin: ins.refMin, refMax: ins.refMax });
+        }
+      });
+    }
 
     DESCARTE_CACHE[ins.key] = { plot };
 
@@ -3147,6 +3273,162 @@ function buildDescarte() {
       }
     });
   });
+
+  // Renderiza o resumo de alertas (pontos fora da faixa de referência)
+  const alertEl = document.getElementById('descAlertas');
+  if (alertEl) {
+    if (!alertasFaixa.length) {
+      alertEl.innerHTML = '';
+    } else {
+      const linhas = alertasFaixa.map(a => `
+        <div style="cursor:pointer;padding:6px 8px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='transparent'" onclick="document.getElementById('chartDesc_${a.insumoKey}')?.scrollIntoView({behavior:'smooth',block:'center'})">
+          <strong>${a.insumoLabel}</strong> — ${a.label}: <span style="color:${a.pct > a.refMax ? '#ef4444' : '#f5a623'};font-weight:600">${a.pct.toFixed(2).replace('.', ',')}%</span>
+          <span style="color:var(--text3)">(faixa ${String(a.refMin).replace('.', ',')}%–${String(a.refMax).replace('.', ',')}%)</span>
+        </div>`).join('');
+      alertEl.innerHTML = `
+        <div class="chart-panel" style="border-color:#f5a623;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:16px">⚠️</span>
+            <strong style="color:#f5a623">${alertasFaixa.length} ${alertasFaixa.length === 1 ? 'ponto fora' : 'pontos fora'} da faixa de referência</strong>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;font-size:12px">${linhas}</div>
+        </div>`;
+    }
+  }
+
+  atualizarBadgePendentes();
+}
+
+// Conta quantos lotes ainda não têm nenhum dado de descarte de insumo lançado
+// (nem em LOTES[].insumos, nem na tabela de fallback INSUMOS_DATA)
+function contarLotesPendentesInsumo() {
+  return LOTES.filter(l => {
+    const temInsumo = (l.insumos && Object.keys(l.insumos).length > 0) || INSUMOS_DATA.some(d => d.lote === l.id);
+    return !temInsumo;
+  }).length;
+}
+
+// Atualiza o badge "(N pendentes)" na aba de navegação "Descarte de Insumos"
+function atualizarBadgePendentes() {
+  const badge = document.getElementById('descPendBadge');
+  if (!badge) return;
+  const n = contarLotesPendentesInsumo();
+  if (n > 0) {
+    badge.textContent = n + ' pendente' + (n !== 1 ? 's' : '');
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// Calcula, em todos os lotes (sem aplicar nenhum filtro), quais pontos ficaram fora
+// da faixa de referência de cada insumo — usado no Resumo Executivo.
+function getAlertasFaixaGlobais() {
+  const dadosUnificados = (() => {
+    const mapa = {};
+    LOTES.forEach(l => {
+      const insLote = l.insumos || null;
+      const fallback = INSUMOS_DATA.find(d => d.lote === l.id);
+      if (!insLote && !fallback) return;
+      const ins = {};
+      INSUMOS_META.forEach(m => {
+        ins[m.key] = insLote ? (insLote[m.key] ?? null) : (fallback ? (fallback[m.key] ?? null) : null);
+      });
+      mapa[l.id] = { lote: l.id, ...ins };
+    });
+    INSUMOS_DATA.forEach(d => {
+      if (!mapa[d.lote]) {
+        const ins = {};
+        INSUMOS_META.forEach(m => { ins[m.key] = d[m.key] ?? null; });
+        mapa[d.lote] = { lote: d.lote, ...ins };
+      }
+    });
+    return Object.values(mapa);
+  })();
+
+  const alertas = [];
+  INSUMOS_META.forEach(ins => {
+    if (ins.refMin == null || ins.refMax == null) return;
+    dadosUnificados.forEach(d => {
+      const l = LOTES.find(x => x.id === d.lote);
+      const planMed = l ? l.plan : null;
+      const qtd = d[ins.key] ?? null;
+      if (!planMed || qtd === null) return;
+      const planejadoInsumo = planMed * ins.prop;
+      const pct = planejadoInsumo > 0 ? (qtd / planejadoInsumo * 100) : null;
+      if (pct !== null && (pct < ins.refMin || pct > ins.refMax)) {
+        alertas.push({ insumoLabel: ins.label, label: d.lote.replace('261001',''), pct, refMin: ins.refMin, refMax: ins.refMax });
+      }
+    });
+  });
+  return alertas;
+}
+
+// Monta a página "Resumo Executivo": KPIs consolidados, alertas de faixa e tabela por lote
+function buildResumoExecutivo() {
+  const el = document.getElementById('resumoConteudo');
+  if (!el) return;
+
+  const totalLotes = LOTES.length;
+  const totalPlan = LOTES.reduce((a, l) => a + l.plan, 0);
+  const totalProd = LOTES.reduce((a, l) => a + l.prod, 0);
+  const totalDesc = LOTES.reduce((a, l) => a + l.desc, 0);
+  const pctDescGeral = totalPlan ? (totalDesc / totalPlan * 100) : 0;
+  const pendentes = contarLotesPendentesInsumo();
+  const alertas = getAlertasFaixaGlobais();
+
+  const kpiCard = (label, valor, cor) => `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">${label}</div>
+      <div style="font-size:24px;font-weight:700;color:${cor || 'var(--text)'}">${valor}</div>
+    </div>`;
+
+  const kpisHtml = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px">
+      ${kpiCard('Total de lotes', totalLotes)}
+      ${kpiCard('Produzido (un.)', fNum(totalProd))}
+      ${kpiCard('% Descarte geral', fPct3(pctDescGeral), pctDescGeral > 1 ? '#f5a623' : 'var(--green2)')}
+      ${kpiCard('Lotes fora da faixa', alertas.length, alertas.length ? '#f5a623' : 'var(--green2)')}
+      ${kpiCard('Insumos pendentes', pendentes, pendentes ? '#f5a623' : 'var(--green2)')}
+    </div>`;
+
+  const alertasHtml = !alertas.length
+    ? `<div style="color:var(--text3);font-size:13px;margin-bottom:20px">Nenhum lote fora da faixa de referência configurada. ✅</div>`
+    : `<div class="chart-panel" style="border-color:#f5a623;margin-bottom:20px">
+        <div style="font-weight:600;color:#f5a623;margin-bottom:10px">⚠️ Lotes fora da faixa de referência</div>
+        <div style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+          ${alertas.map(a => `<div><strong>${a.insumoLabel}</strong> — ${a.label}: <span style="color:${a.pct > a.refMax ? '#ef4444' : '#f5a623'}">${a.pct.toFixed(2).replace('.', ',')}%</span> <span style="color:var(--text3)">(faixa ${String(a.refMin).replace('.', ',')}%–${String(a.refMax).replace('.', ',')}%)</span></div>`).join('')}
+        </div>
+      </div>`;
+
+  const linhasTabela = [...LOTES].sort((a, b) => {
+    const ra = perToDateRange(a.per), rb = perToDateRange(b.per);
+    if (ra && rb) return ra.inicio - rb.inicio;
+    return 0;
+  }).map(l => `
+    <tr>
+      <td><strong>${l.id.replace('261001', '') || '—'}</strong></td>
+      <td style="color:var(--text2)">${l.mes || '—'}</td>
+      <td style="text-align:right">${fNum(l.plan)}</td>
+      <td style="text-align:right">${fNum(l.prod)}</td>
+      <td style="text-align:right">${l.desc}</td>
+      <td style="text-align:right">${l.plan ? fPct3(l.desc / l.plan * 100) : '—'}</td>
+    </tr>`).join('');
+
+  el.innerHTML = `
+    ${kpisHtml}
+    ${alertasHtml}
+    <div class="chart-panel">
+      <div class="chart-title">Lotes — resumo</div>
+      <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead><tr><th>Lote</th><th>Mês</th><th>Planejado</th><th>Produzido</th><th>Descarte</th><th>% Descarte</th></tr></thead>
+          <tbody>${linhasTabela}</tbody>
+        </table>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:16px">Gerado em ${new Date().toLocaleString('pt-BR')}</div>
+  `;
 }
 
 
@@ -3168,6 +3450,7 @@ function rebuildDashboard() {
   buildLoteSelector();
   renderLote(LOTES[0]);
   updateNavBadge();
+  atualizarBadgePendentes();
 
   const activeSection = document.querySelector('.section.active')?.id;
   if(activeSection==='sec-comparativo') buildComparativo();
@@ -3197,6 +3480,11 @@ function initDashboard() {
   renderSheet();
   inicializarDescFiltros();
   inicializarCompFiltros();
+  atualizarBadgePendentes();
+
+  // Aba "Auditoria" só aparece para o e-mail administrador
+  const navAud = document.getElementById('navAuditoria');
+  if (navAud) navAud.style.display = (currentUserEmail && currentUserEmail.toLowerCase() === ADMIN_EMAIL) ? '' : 'none';
 
   // Ativa a aba "Por Lote" como padrão
   const primeiraAba = document.querySelector('.nav-tab');
@@ -3295,6 +3583,8 @@ function traduzirErro(msg) {
 // Mutex: garante que o fluxo de inicialização roda UMA única vez,
 // mesmo que onAuthStateChange dispare múltiplas vezes.
 let _sbEstado = 'aguardando'; // 'aguardando' | 'inicializando' | 'pronto' | 'logout'
+let currentUserEmail = null;
+const ADMIN_EMAIL = 'caiosdd@gmail.com'; // único e-mail com acesso ao histórico de auditoria
 
 function mostrarDashboard() {
   document.getElementById('authOverlay').classList.add('hidden');
@@ -3335,6 +3625,7 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
   if (!session) {
     // Logout: reseta o estado para permitir novo login
     _sbEstado = 'logout';
+    currentUserEmail = null;
     ocultarDashboard();
     return;
   }
@@ -3342,6 +3633,7 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
   // Com sessão válida: só inicializa UMA vez
   if (_sbEstado === 'pronto') {
     // Já inicializado — apenas atualiza o e-mail e o status, sem recriar nada
+    currentUserEmail = session.user.email;
     document.getElementById('userEmail').textContent = session.user.email;
     return;
   }
@@ -3354,6 +3646,7 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
 
   // Primeiro evento com sessão válida — inicializa
   _sbEstado = 'inicializando';
+  currentUserEmail = session.user.email;
   document.getElementById('userEmail').textContent = session.user.email;
 
   await carregarLotesSupabase();
@@ -3383,6 +3676,48 @@ async function salvarLotesSupabase(silencioso) {
   } else {
     setSyncStatus('✓ salvo na nuvem · ' + new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }), 'var(--green2)');
   }
+}
+
+// Registra no Supabase quais lotes foram alterados nesta sessão — a política de segurança
+// do banco (RLS) só permite gravar/ler quando o usuário logado é ADMIN_EMAIL, então essa
+// checagem no cliente é só para não tentar uma escrita que sabemos que vai ser recusada.
+async function registrarAuditoria(loteIds) {
+  if (!sb || !loteIds || !loteIds.length) return;
+  if (!currentUserEmail || currentUserEmail.toLowerCase() !== ADMIN_EMAIL) return;
+  const linhas = loteIds.map(id => ({
+    email: currentUserEmail,
+    lote_id: id,
+    resumo: 'Lote criado ou atualizado via Editar Dados'
+  }));
+  const { error } = await sb.from('auditoria').insert(linhas);
+  if (error) console.error('Erro ao registrar auditoria:', error);
+  else if (document.getElementById('sec-auditoria')?.classList.contains('active')) carregarAuditoria();
+}
+
+// Busca e renderiza o histórico de auditoria — só chamado/visível para ADMIN_EMAIL
+async function carregarAuditoria() {
+  const tbody = document.getElementById('auditoriaTable');
+  if (!tbody) return;
+  if (!sb || !currentUserEmail || currentUserEmail.toLowerCase() !== ADMIN_EMAIL) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text3);padding:24px">Histórico disponível apenas para o administrador.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text3);padding:24px">Carregando…</td></tr>';
+  const { data, error } = await sb.from('auditoria').select('*').order('created_at', { ascending: false }).limit(200);
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#ef4444;padding:24px">Erro ao carregar: ${error.message}</td></tr>`;
+    return;
+  }
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text3);padding:24px">Nenhum registro ainda.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td>${new Date(r.created_at).toLocaleString('pt-BR')}</td>
+      <td><strong>${r.lote_id}</strong></td>
+      <td style="color:var(--text2)">${r.resumo || ''}</td>
+    </tr>`).join('');
 }
 
 // applyChanges já está definido — apenas adiciona o save no Supabase após executar
