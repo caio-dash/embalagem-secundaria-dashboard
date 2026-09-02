@@ -259,7 +259,7 @@ select.cell option { background: var(--bg3); color: var(--text); }
     <div class="nav-tab" onclick="showSection(&#39;comparativo&#39;, this)">Comparativo</div>
     <div class="nav-tab" onclick="showSection(&#39;periodo&#39;, this)">Visão por Período</div>
     <div class="nav-tab" onclick="showSection(&#39;oee&#39;, this)">OEE por Equipamento</div>
-    <div class="nav-tab" onclick="showSection(&#39;descarte&#39;, this)">Descarte de Insumos</div>
+    <div class="nav-tab" onclick="showSection(&#39;descarte&#39;, this)">Descarte de Insumos<span id="descPendenteBadge" style="display:none;margin-left:6px;background:#f5a623;color:#1a1a2e;font-size:10px;font-weight:700;border-radius:10px;padding:1px 7px"></span></div>
     
   </div>
   <div class="nav-badge" id="navBadge">Jan/26–Jun/26 · 16 lotes · 349.742 un.</div>
@@ -793,6 +793,9 @@ select.cell option { background: var(--bg3); color: var(--text); }
     <div class="page-sub">% de descarte em relação ao quantitativo planejado por lote, por insumo</div>
   </div>
 
+  <!-- Alerta: lotes fora da faixa de referência / dados de insumo pendentes -->
+  <div id="descAlertas" style="margin-bottom:16px"></div>
+
   <!-- Filtros -->
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px">
     <span style="font-size:12px;color:var(--text2);font-weight:600">Concentração:</span>
@@ -1271,6 +1274,11 @@ function renderLote(l) {
     <div class="kpi-card"><div class="kpi-label">Desvios Abertos</div><div class="kpi-value ${l.desvAb===0?'good':'bad'}">${l.desvAb}</div><div class="kpi-sub">Em atraso: ${l.desvAtras}</div></div>
   </div>
 
+  ${l.obs ? `<div class="chart-panel" style="margin-bottom:20px;border-color:var(--border2)">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;color:var(--text2);font-weight:600">📝 Observações</div>
+    <div style="font-size:13px;color:var(--text);white-space:pre-wrap">${l.obs.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+  </div>` : ''}
+
   ${oee ? `<div class="oee-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px">
     ${[['Rotuladora 1',oee.rot1],['Rotuladora 2',oee.rot2],['Esteira',oee.esteira],['BLA',oee.bla],['Unitizadora',oee.unit]].map(([nm,v])=>`
     <div class="oee-equip">
@@ -1347,6 +1355,41 @@ function renderLote(l) {
 // ═══════════════════════════════════════════════════════════════════
 let compFiltroConc = 'all';
 let compGranularidade = 'lote'; // 'lote' | 'mensal' | 'trimestral' | 'semestral'
+let COMPARATIVO_CACHE = { itens: [] }; // usado pela exportação CSV dos gráficos do Comparativo
+
+// Exporta os dados de um dos 4 gráficos do Comparativo (Volume, Descarte, Tempo, PNP) em CSV
+function exportarComparativoCSV(qual) {
+  const itens = COMPARATIVO_CACHE.itens;
+  if (!itens || !itens.length) return;
+  const colUnidade = compGranularidade === 'lote' ? 'Lote' : 'Período';
+  let cab, linhas;
+  if (qual === 'volume') {
+    cab = [colUnidade, 'Planejado', 'Produzido'];
+    linhas = itens.map(x => [x.label, x.plan, x.prod]);
+  } else if (qual === 'descarte') {
+    cab = [colUnidade, 'Descarte (un.)', '% Descarte'];
+    linhas = itens.map(x => [x.label, x.desc, x.descPct.toFixed(4).replace('.', ',')]);
+  } else if (qual === 'tempo') {
+    cab = [colUnidade, 'T.Est E4 (h)', 'T.Real E4adj (h)'];
+    linhas = itens.map(x => [x.label, x.tEstE4.toFixed(2).replace('.', ','), x.tRealE4a.toFixed(2).replace('.', ',')]);
+  } else if (qual === 'pnp') {
+    cab = [colUnidade, 'PNP (h)'];
+    linhas = itens.filter(x => x.pnp !== null).map(x => [x.label, x.pnp.toFixed(2).replace('.', ',')]);
+  } else {
+    return;
+  }
+  const csv = [cab, ...linhas].map(l => l.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `comparativo_${qual}_${compGranularidade}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('💾 CSV exportado: ' + qual);
+}
 
 function compFiltroConcClick(el) {
   document.querySelectorAll('#compFiltroConc .lote-btn').forEach(b => b.classList.remove('active'));
@@ -1470,6 +1513,7 @@ function buildComparativo() {
   // Nenhum lote bate com os filtros (concentração/período) — mostra aviso claro em vez
   // de gráficos vazios sem explicação, e para por aqui.
   if (!lotesFiltrados.length) {
+    COMPARATIVO_CACHE = { itens: [] };
     ['sumProd','sumPlan','sumDesc','sumPct'].forEach(id => {
       const el = document.getElementById(id); if (el) el.textContent = '—';
     });
@@ -1497,7 +1541,8 @@ function buildComparativo() {
       descPct: l.plan ? l.desc/l.plan*100 : 0,
       tEstE4: l.tEstE4, tRealE4a: l.tRealE4a,
       pnp: (l.pnp !== null && l.pnp !== undefined) ? l.pnp : null,
-      oeeRot1: (l.oee && l.oee.rot1 !== null && l.oee.rot1 !== undefined) ? l.oee.rot1 : null
+      oeeRot1: (l.oee && l.oee.rot1 !== null && l.oee.rot1 !== undefined) ? l.oee.rot1 : null,
+      obs: l.obs || ''
     }));
   } else {
     const grupos = agregarLotesComparativo(lotesFiltrados);
@@ -1507,11 +1552,13 @@ function buildComparativo() {
       diasTxt: String(g.nLotes),
       nLotes: g.nLotes,
       plan: g.plan, prod: g.prod, desc: g.desc, descPct: g.descPct,
-      tEstE4: g.tEstE4, tRealE4a: g.tRealE4a, pnp: g.pnp, oeeRot1: g.oeeRot1
+      tEstE4: g.tEstE4, tRealE4a: g.tRealE4a, pnp: g.pnp, oeeRot1: g.oeeRot1,
+      obs: ''
     }));
   }
 
   const granLabel = { lote:'lote', mensal:'mês', trimestral:'trimestre', semestral:'semestre' }[compGranularidade];
+  COMPARATIVO_CACHE = { itens };
   const colDiasLabel = compGranularidade === 'lote' ? 'Dias' : 'Nº Lotes';
   const tituloVol = compGranularidade === 'lote' ? 'Volume produzido por lote' : `Volume produzido por ${granLabel}`;
   const tituloDesc = compGranularidade === 'lote' ? 'Descarte por lote (unidades)' : `Descarte por ${granLabel} (unidades)`;
@@ -1719,7 +1766,7 @@ function buildComparativo() {
   itens.forEach(x => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><strong>${x.label}</strong></td>
+      <td><strong>${x.label}</strong>${x.obs ? ` <span title="${x.obs.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}" style="cursor:help">📝</span>` : ''}</td>
       <td style="color:var(--text2)">${x.perTxt}</td>
       <td style="text-align:center">${x.diasTxt}</td>
       <td style="text-align:right">${fNum(x.plan)}</td>
@@ -2586,6 +2633,60 @@ function exportarDescarteCSV(key) {
   showToast('💾 CSV exportado: ' + ins.label);
 }
 
+// Lotes que ainda não têm nenhum dado de descarte de insumo lançado
+function lotesPendentesInsumo() {
+  return LOTES.filter(l => {
+    const temInsumo = (l.insumos && Object.keys(l.insumos).length > 0) || INSUMOS_DATA.some(d => d.lote === l.id);
+    return !temInsumo;
+  }).map(l => l.id.replace('261001', ''));
+}
+
+// Atualiza o contador "(N pendentes)" na aba de navegação "Descarte de Insumos"
+function atualizarBadgePendentes() {
+  const pend = lotesPendentesInsumo();
+  const badge = document.getElementById('descPendenteBadge');
+  if (!badge) return;
+  if (pend.length > 0) {
+    badge.textContent = pend.length + ' pendente' + (pend.length > 1 ? 's' : '');
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// Renderiza os avisos no topo da aba Descarte: lotes sem dados de insumo lançados
+// (sempre, independente do filtro) e pontos fora da faixa de referência (na visão atual)
+function renderDescAlertas(violacoes) {
+  const cont = document.getElementById('descAlertas');
+  if (!cont) return;
+  const pendentes = lotesPendentesInsumo();
+  let html = '';
+
+  if (pendentes.length) {
+    html += `<div style="background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.4);border-radius:10px;padding:12px 16px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:16px">⚠️</span>
+      <span style="font-size:13px;color:var(--text)"><strong>${pendentes.length} lote${pendentes.length > 1 ? 's' : ''}</strong> sem dados de descarte de insumo lançados:</span>
+      <span style="display:flex;gap:4px;flex-wrap:wrap">${pendentes.map(id => `<span style="background:rgba(245,166,35,0.2);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">${id}</span>`).join('')}</span>
+    </div>`;
+  }
+
+  if (violacoes.length) {
+    const porInsumo = {};
+    violacoes.forEach(v => { (porInsumo[v.insumo] = porInsumo[v.insumo] || []).push(v); });
+    html += `<div style="background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.4);border-radius:10px;padding:12px 16px;display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:16px">🔴</span>
+        <span style="font-size:13px;color:var(--text)"><strong>${violacoes.length} ponto${violacoes.length > 1 ? 's' : ''}</strong> fora da faixa de referência (na visualização atual):</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;padding-left:26px">
+        ${Object.keys(porInsumo).map(ins => `<div style="font-size:12px;color:var(--text2)"><strong>${ins}:</strong> ${porInsumo[ins].map(v => `${v.label} (${v.pct.toFixed(2)}%)`).join(', ')}</div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  cont.innerHTML = html;
+}
+
 function buildDescarte() {
   // Fonte principal: LOTES[].insumos (editado na planilha).
   // Fallback: INSUMOS_DATA (dados históricos hardcoded).
@@ -2651,8 +2752,11 @@ function buildDescarte() {
 
   if (!itens.length) {
     container.innerHTML = '<div style="color:var(--text3);padding:32px;text-align:center;grid-column:1/-1">Nenhum lote encontrado para os filtros selecionados.</div>';
+    renderDescAlertas([]);
     return;
   }
+
+  const violacoesFaixa = [];
 
   INSUMOS_META.forEach(ins => {
     const plot = construirPlotInsumo(itens, ins);
@@ -2664,6 +2768,14 @@ function buildDescarte() {
     const media = calcularMedia(pcts);
 
     DESCARTE_CACHE[ins.key] = { plot };
+
+    if (ins.refMin != null && ins.refMax != null) {
+      plot.forEach(p => {
+        if (p.pct !== null && (p.pct < ins.refMin || p.pct > ins.refMax)) {
+          violacoesFaixa.push({ insumo: ins.label, label: p.label, pct: p.pct });
+        }
+      });
+    }
 
     const wrap = document.createElement('div');
     wrap.className = 'chart-panel';
@@ -2770,6 +2882,8 @@ function buildDescarte() {
       }
     });
   });
+
+  renderDescAlertas(violacoesFaixa);
 }
 
 
@@ -2791,6 +2905,7 @@ function rebuildDashboard() {
   buildLoteSelector();
   renderLote(LOTES[0]);
   updateNavBadge();
+  atualizarBadgePendentes();
 
   const activeSection = document.querySelector('.section.active')?.id;
   if(activeSection==='sec-comparativo') buildComparativo();
@@ -2820,6 +2935,7 @@ function initDashboard() {
   renderSheet();
   inicializarDescFiltros();
   inicializarCompFiltros();
+  atualizarBadgePendentes();
 
   // Ativa a aba "Por Lote" como padrão
   const primeiraAba = document.querySelector('.nav-tab');
