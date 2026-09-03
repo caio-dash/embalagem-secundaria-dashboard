@@ -468,6 +468,7 @@ select.cell option { background: var(--bg3); color: var(--text); }
     <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
       <div class="chart-title">Progresso acumulado de lotes — 2026</div>
       <div id="progressoBadges" style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto"></div>
+      <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('progressoAnual','progresso_acumulado_anual')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
     </div>
     <div class="chart-insight" id="progressoInsight"></div>
     <div class="chart-wrap" style="height:300px"><canvas id="chartProgressoAnual"></canvas></div>
@@ -732,12 +733,18 @@ select.cell option { background: var(--bg3); color: var(--text); }
 
   <div class="chart-row cols2">
     <div class="chart-panel">
-      <div class="chart-title">Volume: Planejado vs. Produzido</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title">Volume: Planejado vs. Produzido</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('periodoVol','periodo_volume')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Aderência ao plano por período selecionado</div>
       <div class="chart-wrap" style="height:280px"><canvas id="chartPeriodoVol"></canvas></div>
     </div>
     <div class="chart-panel">
-      <div class="chart-title">Índice de descarte (%)</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title">Índice de descarte (%)</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('periodoDesc','periodo_descarte')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Percentual de descarte em relação ao planejado</div>
       <div class="chart-wrap" style="height:280px"><canvas id="chartPeriodoDesc"></canvas></div>
     </div>
@@ -745,12 +752,18 @@ select.cell option { background: var(--bg3); color: var(--text); }
 
   <div class="chart-row cols2">
     <div class="chart-panel">
-      <div class="chart-title">Tempo médio — Etapa 4 Ajustada (h)</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title">Tempo médio — Etapa 4 Ajustada (h)</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('periodoTempo','periodo_tempo')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Comparação entre tempo estimado e tempo real ajustado</div>
       <div class="chart-wrap" style="height:260px"><canvas id="chartPeriodoTempo"></canvas></div>
     </div>
     <div class="chart-panel">
-      <div class="chart-title">OEE médio (equipamentos com dados)</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title">OEE médio (equipamentos com dados)</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('periodoOEE','periodo_oee')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Meta de 85% indicada pela linha pontilhada</div>
       <div class="chart-wrap" style="height:260px"><canvas id="chartPeriodoOEE"></canvas></div>
     </div>
@@ -830,7 +843,10 @@ select.cell option { background: var(--bg3); color: var(--text); }
 
   <div class="chart-row">
     <div class="chart-panel">
-      <div class="chart-title">Evolução do OEE por lote — todos os equipamentos</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title">Evolução do OEE por lote — todos os equipamentos</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('oeeEvol','oee_evolucao')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Linha pontilhada indica a meta de 85%</div>
       <div class="chart-wrap" style="height:340px"><canvas id="chartOEEEvolucao" role="img" aria-label="Evolução do OEE por lote para todos os equipamentos" style="box-sizing: border-box; display: block; height: 340px; width: 1310px;" width="1310" height="340"></canvas></div>
     </div>
@@ -908,7 +924,7 @@ select.cell option { background: var(--bg3); color: var(--text); }
   <div class="sheet-wrap">
     <table class="sheet-table">
       <thead><tr>
-        <th>Lote</th><th>Período</th><th title="Preenchido automaticamente a partir do Período">Mês ⚡</th><th title="Preenchido automaticamente a partir do Período">Trim. ⚡</th><th title="Preenchido automaticamente a partir do Período (dias úteis, sem fins de semana)">Dias ⚡</th>
+        <th>Lote</th><th style="min-width:220px;background:rgba(245,166,35,0.08)">📝 Observações</th><th>Período</th><th title="Preenchido automaticamente a partir do Período">Mês ⚡</th><th title="Preenchido automaticamente a partir do Período">Trim. ⚡</th><th title="Preenchido automaticamente a partir do Período (dias úteis, sem fins de semana)">Dias ⚡</th>
         <th>Planejado</th><th>Produzido</th><th>Descarte</th>
         <th>T.Est E4 (h)</th><th>T.Real E4adj (h)</th><th>PNP (h)</th>
         <th>OEE Rot.1 (%)</th><th>OEE Rot.2 (%)</th><th>OEE Esteira (%)</th><th>OEE BLA (%)</th><th>OEE Unit. (%)</th>
@@ -1593,6 +1609,39 @@ function setChart(key, canvasId, config) {
   CHARTS[key] = new Chart(el, config);
 }
 
+// Exportação genérica de CSV para qualquer gráfico registrado em CHARTS — lê direto os
+// labels/datasets já renderizados no Chart.js, então o CSV sempre bate com o que está na tela.
+function exportarChartCSV(chartKey, nomeArquivo) {
+  const chart = CHARTS[chartKey];
+  if (!chart || !chart.data) return;
+  const labels = chart.data.labels || [];
+  const datasets = chart.data.datasets || [];
+  if (!labels.length || !datasets.length) return;
+  const cab = ['Rótulo', ...datasets.map(ds => ds.label || 'Série')];
+  const linhas = [cab];
+  labels.forEach((lab, i) => {
+    const linha = [lab];
+    datasets.forEach(ds => {
+      const v = ds.data ? ds.data[i] : null;
+      if (v === null || v === undefined) linha.push('');
+      else if (typeof v === 'number') linha.push(v.toFixed(4).replace(/\.?0+$/, '').replace('.', ',') || '0');
+      else linha.push(String(v));
+    });
+    linhas.push(linha);
+  });
+  const csv = linhas.map(l => l.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (nomeArquivo || chartKey) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  if (typeof showToast === 'function') showToast('💾 CSV exportado');
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // AGREGAÇÕES DINÂMICAS (recalculadas a partir de LOTES)
 // ═══════════════════════════════════════════════════════════════════
@@ -1720,10 +1769,10 @@ function renderLote(l) {
     <div class="kpi-card"><div class="kpi-label">Desvios Abertos</div><div class="kpi-value ${l.desvAb===0?'good':'bad'}">${l.desvAb}</div><div class="kpi-sub">Em atraso: ${l.desvAtras}</div></div>
   </div>
 
-  ${l.obs ? `<div class="chart-panel" style="margin-bottom:20px;border-color:var(--border2)">
+  <div class="chart-panel" style="margin-bottom:20px;border-color:var(--border2)">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;color:var(--text2);font-weight:600">📝 Observações</div>
-    <div style="font-size:13px;color:var(--text);white-space:pre-wrap">${l.obs.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-  </div>` : ''}
+    <div style="font-size:13px;color:${l.obs ? 'var(--text)' : 'var(--text3)'};white-space:pre-wrap">${l.obs ? l.obs.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : 'Nenhuma observação registrada. Adicione uma na aba "Editar Dados".'}</div>
+  </div>
 
   ${oee ? `<div class="oee-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px">
     ${[['Rotuladora 1',oee.rot1],['Rotuladora 2',oee.rot2],['Esteira',oee.esteira],['BLA',oee.bla],['Unitizadora',oee.unit]].map(([nm,v])=>`
@@ -1743,24 +1792,36 @@ function renderLote(l) {
 
   <div class="chart-row cols2">
     <div class="chart-panel">
-      <div class="chart-title">Volume diário — Planejado vs. Produzido</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title">Volume diário — Planejado vs. Produzido</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('lote_vol','volume_diario_${l.id}')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Período: ${l.per || '—'} · ${l.dias} dias de produção</div>
       <div class="chart-wrap" style="height:240px"><canvas id="loteVol"></canvas></div>
     </div>
     <div class="chart-panel">
-      <div class="chart-title">Tempo diário — Estimado vs. Real (h)</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title">Tempo diário — Estimado vs. Real (h)</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('lote_tempo','tempo_diario_${l.id}')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Atraso acumulado total: ${fH((l.diarios||[]).reduce((a,d)=>a+(d.tR-d.tE)*24,0))}</div>
       <div class="chart-wrap" style="height:240px"><canvas id="loteTempo"></canvas></div>
     </div>
   </div>
   <div class="chart-row cols2">
     <div class="chart-panel">
-      <div class="chart-title">Efetivo diário — Ajustado vs. Real</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title">Efetivo diário — Ajustado vs. Real</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('lote_efetivo','efetivo_diario_${l.id}')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Efetivo previsto (descontadas ausências) × operadores presentes</div>
       <div class="chart-wrap" style="height:220px"><canvas id="loteEfetivo"></canvas></div>
     </div>
     <div class="chart-panel">
-      <div class="chart-title">Progresso acumulado do lote (%)</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title">Progresso acumulado do lote (%)</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('lote_acum','progresso_acumulado_${l.id}')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Evolução percentual da produção ao longo dos dias</div>
       <div class="chart-wrap" style="height:220px"><canvas id="loteAcum"></canvas></div>
     </div>
@@ -2537,6 +2598,7 @@ function sheetRow(l, idx) {
   // Linha principal
   tr.innerHTML = `
     <td><input class="cell f-id" value="${l.id||''}" placeholder="ID do lote" style="min-width:110px"></td>
+    <td style="background:rgba(245,166,35,0.04)"><textarea class="cell f-obs" rows="1" placeholder="Ex.: parada por manutenção corretiva na rotuladora 2" style="min-width:220px;width:100%;resize:vertical;font-family:inherit;background:var(--bg3);border:none;color:var(--text);padding:8px;font-size:12px">${escHtml(l.obs)}</textarea></td>
     <td><input class="cell f-per" value="${l.per||''}" placeholder="dd/mm–dd/mm"></td>
     <td><input class="cell f-mes" value="${l.mes||''}" list="mesList" placeholder="Mês/26"></td>
     <td><select class="cell f-q">${Q_ORDER.map(q=>`<option value="${q}" ${q===l.q?'selected':''}>${q}</option>`).join('')}</select></td>
@@ -2561,8 +2623,8 @@ function sheetRow(l, idx) {
     <td><button class="row-del" title="Remover lote" onclick="removerLinhaLote(this)">✕</button></td>
   `;
 
-  // Sub-linha de insumos (colspan = total de colunas = 20)
-  const COLS = 20;
+  // Sub-linha de insumos (colspan = total de colunas = 21)
+  const COLS = 21;
   const trIns = document.createElement('tr');
   trIns.className = 'ins-row';
   trIns.id = uid;
@@ -2594,11 +2656,6 @@ function sheetRow(l, idx) {
         </div>
         <div style="width:1px;background:var(--border);align-self:stretch;margin:0 4px"></div>
         ${insFields}
-        <div style="width:1px;background:var(--border);align-self:stretch;margin:0 4px"></div>
-        <div class="ins-field" style="flex:1;min-width:240px">
-          <span class="ins-label">Observações / causa-raiz</span>
-          <textarea class="cell f-obs" rows="1" placeholder="Ex.: parada por manutenção corretiva na rotuladora 2" style="min-width:0;width:100%;resize:vertical;font-family:inherit;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px">${escHtml(l.obs)}</textarea>
-        </div>
         <div style="align-self:flex-end;margin-left:4px;font-size:10px;color:var(--text3)">Descarte por insumo (un.)</div>
       </div>
     </td>`;
@@ -2743,6 +2800,7 @@ function applyChanges() {
     const pnp = pnpRaw === '' ? null : +pnpRaw;
     const desvAb = +v('f-desvab') || 0;
     const desvAtras = +v('f-desvatr') || 0;
+    const obs = (v('f-obs') || '').trim();
 
     // Filtro rigoroso: ignora linhas sem ID nem período nem produção
     if (!id.trim() && !per.trim() && !plan && !prod) return;
@@ -2763,7 +2821,6 @@ function applyChanges() {
     const conc = vi('f-conc') || '';
     const opRaw = vi('f-op');
     const op = opRaw === '' ? null : +opRaw;
-    const obs = (vi('f-obs') || '').trim();
     const insumos = {};
     INSUMOS_META.forEach(ins_ => {
       const raw = vi('f-ins-' + ins_.key);
@@ -3287,16 +3344,33 @@ function buildDescarte() {
         </div>`).join('');
       alertEl.innerHTML = `
         <div class="chart-panel" style="border-color:#f5a623;margin-bottom:16px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer" onclick="toggleAlertasFaixa()">
             <span style="font-size:16px">⚠️</span>
-            <strong style="color:#f5a623">${alertasFaixa.length} ${alertasFaixa.length === 1 ? 'ponto fora' : 'pontos fora'} da faixa de referência</strong>
+            <strong style="color:#f5a623;flex:1">${alertasFaixa.length} ${alertasFaixa.length === 1 ? 'ponto fora' : 'pontos fora'} da faixa de referência</strong>
+            <span id="descAlertasFaixaToggleIcone" style="font-size:11px;color:var(--text3)">▲ ocultar</span>
           </div>
-          <div style="display:flex;flex-direction:column;gap:2px;font-size:12px">${linhas}</div>
+          <div id="descAlertasFaixaConteudo" style="display:flex;flex-direction:column;gap:2px;font-size:12px">${linhas}</div>
         </div>`;
+      aplicarEstadoAlertasFaixa();
     }
   }
 
   atualizarBadgePendentes();
+}
+
+// Lembra se o usuário escondeu a caixa de alertas de faixa (persiste durante a sessão,
+// já que a caixa é reconstruída a cada buildDescarte())
+let alertasFaixaVisivel = true;
+function toggleAlertasFaixa() {
+  alertasFaixaVisivel = !alertasFaixaVisivel;
+  aplicarEstadoAlertasFaixa();
+}
+function aplicarEstadoAlertasFaixa() {
+  const conteudo = document.getElementById('descAlertasFaixaConteudo');
+  const icone = document.getElementById('descAlertasFaixaToggleIcone');
+  if (!conteudo || !icone) return;
+  conteudo.style.display = alertasFaixaVisivel ? 'flex' : 'none';
+  icone.textContent = alertasFaixaVisivel ? '▲ ocultar' : '▼ mostrar';
 }
 
 // Conta quantos lotes ainda não têm nenhum dado de descarte de insumo lançado
