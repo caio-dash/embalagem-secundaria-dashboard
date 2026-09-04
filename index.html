@@ -2720,7 +2720,7 @@ function renderDescAlertas(violacoes) {
     html += `<div id="descAlertasFaixaBox" style="background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.4);border-radius:10px;padding:12px 16px;display:flex;flex-direction:column;gap:6px">
       <div style="display:flex;align-items:center;gap:10px;cursor:pointer" onclick="toggleAlertasFaixa()">
         <span style="font-size:16px">🔴</span>
-        <span style="font-size:13px;color:var(--text);flex:1"><strong>${violacoes.length} ponto${violacoes.length > 1 ? 's' : ''}</strong> fora da faixa de referência (na visualização atual):</span>
+        <span style="font-size:13px;color:var(--text);flex:1"><strong>${violacoes.length} ponto${violacoes.length > 1 ? 's' : ''}</strong> acima da faixa de referência (na visualização atual):</span>
         <span id="descAlertasFaixaToggleIcone" style="font-size:11px;color:var(--text3)">▲ ocultar</span>
       </div>
       <div id="descAlertasFaixaConteudo" style="display:flex;flex-direction:column;gap:4px;padding-left:26px">
@@ -2832,7 +2832,7 @@ function buildDescarte() {
 
     if (ins.refMin != null && ins.refMax != null) {
       plot.forEach(p => {
-        if (p.pct !== null && (p.pct < ins.refMin || p.pct > ins.refMax)) {
+        if (p.pct !== null && p.pct > ins.refMax) {
           violacoesFaixa.push({ insumo: ins.label, label: p.label, pct: p.pct });
         }
       });
