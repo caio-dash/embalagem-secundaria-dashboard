@@ -431,12 +431,18 @@ select.cell option { background: var(--bg3); color: var(--text); }
 
   <div class="chart-row cols2">
     <div class="chart-panel">
-      <div class="chart-title" id="compVolTitle">Volume produzido por lote</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title" id="compVolTitle">Volume produzido por lote</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarComparativoCSV('vol')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Planejado × Realizado por lote</div>
       <div class="chart-wrap" style="height:320px"><canvas id="chartCompVol" role="img" aria-label="Volume planejado versus produzido por lote" style="box-sizing: border-box; display: block; height: 320px; width: 626px;" width="626" height="320"></canvas></div>
     </div>
     <div class="chart-panel">
-      <div class="chart-title" id="compDescTitle">Descarte por lote (unidades)</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title" id="compDescTitle">Descarte por lote (unidades)</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarComparativoCSV('desc')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Unidades descartadas em cada lote</div>
       <div class="chart-wrap" style="height:320px"><canvas id="chartCompDesc" role="img" aria-label="Unidades descartadas por lote" style="box-sizing: border-box; display: block; height: 320px; width: 626px;" width="626" height="320"></canvas></div>
     </div>
@@ -444,12 +450,18 @@ select.cell option { background: var(--bg3); color: var(--text); }
 
   <div class="chart-row cols2">
     <div class="chart-panel">
-      <div class="chart-title" id="compTempoTitle">Tempo real Etapa 4 Ajustada por lote (h)</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title" id="compTempoTitle">Tempo real Etapa 4 Ajustada por lote (h)</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarComparativoCSV('tempo')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Tempo estimado vs. tempo real ajustado por lote</div>
       <div class="chart-wrap" style="height:280px"><canvas id="chartCompTempo" role="img" aria-label="Tempo real da etapa 4 ajustada por lote" style="box-sizing: border-box; display: block; height: 280px; width: 626px;" width="626" height="280"></canvas></div>
     </div>
     <div class="chart-panel">
-      <div class="chart-title" id="compPNPTitle">Paradas não planejadas registradas (h)</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title" id="compPNPTitle">Paradas não planejadas registradas (h)</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarComparativoCSV('pnp')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
       <div class="chart-insight">Disponível apenas para lotes com PNP preenchido</div>
       <div class="chart-wrap" style="height:280px"><canvas id="chartCompPNP" role="img" aria-label="Paradas não planejadas por lote" style="box-sizing: border-box; display: block; height: 280px; width: 626px;" width="626" height="280"></canvas></div>
     </div>
@@ -1419,37 +1431,34 @@ let compGranularidade = 'lote'; // 'lote' | 'mensal' | 'trimestral' | 'semestral
 let COMPARATIVO_CACHE = { itens: [] }; // usado pela exportação CSV dos gráficos do Comparativo
 
 // Exporta os dados de um dos 4 gráficos do Comparativo (Volume, Descarte, Tempo, PNP) em CSV
-function exportarComparativoCSV(qual) {
-  const itens = COMPARATIVO_CACHE.itens;
-  if (!itens || !itens.length) return;
-  const colUnidade = compGranularidade === 'lote' ? 'Lote' : 'Período';
-  let cab, linhas;
-  if (qual === 'volume') {
-    cab = [colUnidade, 'Planejado', 'Produzido'];
-    linhas = itens.map(x => [x.label, x.plan, x.prod]);
-  } else if (qual === 'descarte') {
-    cab = [colUnidade, 'Descarte (un.)', '% Descarte'];
-    linhas = itens.map(x => [x.label, x.desc, x.descPct.toFixed(4).replace('.', ',')]);
-  } else if (qual === 'tempo') {
-    cab = [colUnidade, 'T.Est E4 (h)', 'T.Real E4adj (h)'];
-    linhas = itens.map(x => [x.label, x.tEstE4.toFixed(2).replace('.', ','), x.tRealE4a.toFixed(2).replace('.', ',')]);
-  } else if (qual === 'pnp') {
-    cab = [colUnidade, 'PNP (h)'];
-    linhas = itens.filter(x => x.pnp !== null).map(x => [x.label, x.pnp.toFixed(2).replace('.', ',')]);
-  } else {
-    return;
-  }
-  const csv = [cab, ...linhas].map(l => l.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+function exportarComparativoCSV(chave) {
+  const itens = COMPARATIVO_CACHE.itens || [];
+  if (!itens.length) return;
+  const gran = COMPARATIVO_CACHE.granularidade || compGranularidade || 'lote';
+  const rotuloCol = gran === 'lote' ? 'Lote' : 'Período';
+
+  const specs = {
+    vol:   { arquivo: 'comparativo_volume',  cab: [rotuloCol, 'Planejado', 'Produzido'], linha: x => [x.label, x.plan, x.prod] },
+    desc:  { arquivo: 'comparativo_descarte', cab: [rotuloCol, 'Descarte (un.)', '% Descarte'], linha: x => [x.label, x.desc, x.descPct.toFixed(4).replace('.', ',')] },
+    tempo: { arquivo: 'comparativo_tempo',    cab: [rotuloCol, 'T.Est E4 (h)', 'T.Real E4adj (h)'], linha: x => [x.label, x.tEstE4.toFixed(2).replace('.', ','), x.tRealE4a.toFixed(2).replace('.', ',')] },
+    pnp:   { arquivo: 'comparativo_pnp',      cab: [rotuloCol, 'PNP (h)'], linha: x => [x.label, x.pnp !== null ? x.pnp.toFixed(2).replace('.', ',') : ''] },
+  };
+  const spec = specs[chave];
+  if (!spec) return;
+
+  const dados = chave === 'pnp' ? itens.filter(x => x.pnp !== null) : itens;
+  const linhas = [spec.cab, ...dados.map(spec.linha)];
+  const csv = linhas.map(l => l.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `comparativo_${qual}_${compGranularidade}.csv`;
+  a.download = `${spec.arquivo}_${gran}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showToast('💾 CSV exportado: ' + qual);
+  if (typeof showToast === 'function') showToast('💾 CSV exportado');
 }
 
 function compFiltroConcClick(el) {
