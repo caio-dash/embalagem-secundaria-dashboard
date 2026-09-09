@@ -302,6 +302,7 @@ select.cell option { background: var(--bg3); color: var(--text); }
     <div class="nav-tab" onclick="showSection(&#39;comparativo&#39;, this)">Comparativo</div>
     <div class="nav-tab" onclick="showSection(&#39;periodo&#39;, this)">Visão por Período</div>
     <div class="nav-tab" onclick="showSection(&#39;oee&#39;, this)">OEE por Equipamento</div>
+    <div class="nav-tab" onclick="showSection(&#39;kit&#39;, this)">Kit Médico</div>
     <div class="nav-tab" onclick="showSection(&#39;descarte&#39;, this)">Descarte de Insumos<span id="descPendBadge" style="display:none;margin-left:6px;background:#f5a623;color:#1a1a1a;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px"></span></div>
     <div class="nav-tab active" onclick="showSection(&#39;planilha&#39;, this)">Editar Dados</div>
     <div class="nav-tab" onclick="showSection(&#39;resumo&#39;, this)">Resumo Executivo</div>
@@ -860,6 +861,60 @@ select.cell option { background: var(--bg3); color: var(--text); }
 </div>
 
 <!-- ════════════════════════════════════════════════ SEÇÃO: DESCARTE INSUMOS -->
+<div id="sec-kit" class="section">
+  <div class="page-header">
+    <div class="page-title">Kit Médico</div>
+    <div class="page-sub">Indicadores exclusivos do produto Kit Médico — controlados separadamente dos demais produtos</div>
+  </div>
+
+  <div class="chart-panel" style="margin-bottom:20px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <div class="chart-title">Volume Planejado × Produzido por lote</div>
+      <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('kit_vol','kit_medico_volume')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+    </div>
+    <div class="chart-insight">Quantidade planejada vs. produzida de Kit Médico por lote</div>
+    <div class="chart-wrap" style="height:300px"><canvas id="chartKitVol"></canvas></div>
+  </div>
+
+  <div class="chart-row cols2">
+    <div class="chart-panel">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title">PNP por lote</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('kit_pnp','kit_medico_pnp')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
+      <div class="chart-insight">Paradas não planejadas registradas por lote (h)</div>
+      <div class="chart-wrap" style="height:300px"><canvas id="chartKitPNP"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title">Desvios abertos por lote</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('kit_desvab','kit_medico_desvios')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
+      <div class="chart-insight">Quantidade de desvios abertos por lote</div>
+      <div class="chart-wrap" style="height:300px"><canvas id="chartKitDesvAb"></canvas></div>
+    </div>
+  </div>
+
+  <div class="page-header" style="margin-top:28px;margin-bottom:12px">
+    <div class="page-title" style="font-size:16px">Descarte por insumo — Kit Médico</div>
+    <div class="page-sub">Cartucho, Bula, Swab, Curativo, Escalpe e Seringa</div>
+  </div>
+  <div id="kitDescarteCharts" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:20px"></div>
+
+  <div class="chart-panel" style="margin-top:20px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <div class="chart-title">Lotes — Kit Médico</div>
+      <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarKitLotesCSV()" title="Exportar esta tabela em CSV">⭳ CSV</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table" id="kitLotesTable">
+        <thead><tr><th>Lote</th><th>Período</th><th>Mês</th><th>Trim.</th><th>Dias</th><th>Planejado</th><th>Produzido</th><th>PNP</th><th>Desv. Abertos</th></tr></thead>
+        <tbody id="kitLotesTableBody"><tr><td colspan="9" style="text-align:center;color:var(--text3);padding:24px">Nenhum lote de Kit Médico cadastrado ainda. Adicione um na aba "Editar Dados".</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div id="sec-descarte" class="section">
   <div class="page-header">
     <div class="page-title">Descarte de Insumos</div>
@@ -1260,6 +1315,32 @@ select.cell option { background: var(--bg3); color: var(--text); }
     <option>Set/26</option><option>Out/26</option><option>Nov/26</option><option>Dez/26</option>
   </datalist>
 
+  <div class="page-header" style="margin-top:36px">
+    <div class="page-title" style="font-size:18px">Kit Médico — Planilha</div>
+    <div class="page-sub">Lotes do produto Kit Médico — controle próprio, independente da linha Hemo-8r. Os gráficos ficam na aba "Kit Médico".</div>
+  </div>
+
+  <div class="sheet-toolbar">
+    <button class="btn btn-primary" onclick="applyKitChanges()">↻ Atualizar Kit Médico</button>
+    <button class="btn btn-secondary" onclick="addKitSheetRow()">+ Adicionar Lote (Kit Médico)</button>
+    <span id="kitSheetSyncStatus" style="font-size:11px;color:var(--text3);margin-left:4px"></span>
+  </div>
+
+  <div class="sheet-wrap">
+    <table class="sheet-table">
+      <thead><tr>
+        <th>Lote</th><th style="min-width:220px;background:rgba(245,166,35,0.08)">📝 Observações</th><th>Período</th>
+        <th title="Preenchido automaticamente a partir do Período">Mês ⚡</th>
+        <th title="Preenchido automaticamente a partir do Período">Trim. ⚡</th>
+        <th title="Preenchido automaticamente a partir do Período (dias úteis, sem fins de semana)">Dias ⚡</th>
+        <th>Planejado</th><th>Produzido</th>
+        <th>PNP (h)</th><th>Desv. Abertos</th>
+        <th title="Expandir campos de descarte de insumos">Insumos</th><th></th>
+      </tr></thead>
+      <tbody id="kitSheetBody"></tbody>
+    </table>
+  </div>
+
   <div class="summary-box" style="margin-top:20px">
     <h3>Como usar</h3>
     <div style="font-size:12.5px;color:var(--text2);line-height:1.8">
@@ -1304,7 +1385,7 @@ select.cell option { background: var(--bg3); color: var(--text); }
 <div class="toast" id="toast">✓ Dashboard atualizado com sucesso!</div>
 </div><!-- /dashboardMain -->
 
-<script type="application/json" id="lotesData">[{"id":"261001B001","per":"13–19/jan","mes":"Jan/26","q":"Q1","conc":"","dias":5,"plan":22148,"prod":22144,"desc":4,"tEstE4":14.73,"tRealE4a":18.2,"pnp":null,"oee":null,"desvAb":0,"desvAtras":0,"diarios":[{"d":"13/jan","est":6000,"real":1547,"desc":4,"tE":0.042,"tR":0.065,"efPrev":21,"ausP":3,"efReal":18},{"d":"14/jan","est":6000,"real":6099,"desc":0,"tE":0.169,"tR":0.368,"efPrev":21,"ausP":3,"efReal":18},{"d":"15/jan","est":6000,"real":6400,"desc":0,"tE":0.178,"tR":0.293,"efPrev":21,"ausP":0,"efReal":20},{"d":"16/jan","est":6000,"real":5815,"desc":0,"tE":0.161,"tR":0.309,"efPrev":21,"ausP":0,"efReal":21},{"d":"19/jan","est":2283,"real":2283,"desc":0,"tE":0.063,"tR":0.126,"efPrev":21,"ausP":2,"efReal":18}]},{"id":"261001C001","per":"20–27/jan","mes":"Jan/26","q":"Q1","conc":"","dias":6,"plan":22070,"prod":22065,"desc":5,"tEstE4":14.72,"tRealE4a":17.4,"pnp":null,"oee":null,"desvAb":0,"desvAtras":0,"diarios":[{"d":"20/jan","est":6000,"real":0,"desc":5,"tE":0,"tR":0,"efPrev":21,"ausP":1,"efReal":20},{"d":"21/jan","est":6000,"real":2869,"desc":0,"tE":0.08,"tR":0.208,"efPrev":21,"ausP":1,"efReal":19},{"d":"22/jan","est":6000,"real":6399,"desc":0,"tE":0.178,"tR":0.311,"efPrev":21,"ausP":0,"efReal":18},{"d":"23/jan","est":6000,"real":4799,"desc":0,"tE":0.133,"tR":0.318,"efPrev":21,"ausP":1,"efReal":18},{"d":"26/jan","est":6000,"real":2799,"desc":0,"tE":0.078,"tR":0.3,"efPrev":21,"ausP":0,"efReal":18},{"d":"27/jan","est":5199,"real":5199,"desc":0,"tE":0.144,"tR":0.276,"efPrev":21,"ausP":2,"efReal":19}]},{"id":"261001D001","per":"06–12/jan","mes":"Jan/26","q":"Q1","conc":"","dias":5,"plan":21880,"prod":21850,"desc":30,"tEstE4":14.58,"tRealE4a":19.92,"pnp":null,"oee":null,"desvAb":0,"desvAtras":0,"diarios":[{"d":"06/jan","est":6000,"real":1478,"desc":30,"tE":0.042,"tR":0.072,"efPrev":21,"ausP":1,"efReal":19},{"d":"07/jan","est":6000,"real":4289,"desc":0,"tE":0.119,"tR":0.302,"efPrev":21,"ausP":1,"efReal":20},{"d":"08/jan","est":6000,"real":7095,"desc":0,"tE":0.197,"tR":0.317,"efPrev":21,"ausP":1,"efReal":19},{"d":"09/jan","est":6000,"real":5791,"desc":0,"tE":0.161,"tR":0.315,"efPrev":21,"ausP":1,"efReal":19},{"d":"12/jan","est":3197,"real":3197,"desc":0,"tE":0.089,"tR":0.266,"efPrev":21,"ausP":1,"efReal":20}]},{"id":"261001A001","per":"09–13/fev","mes":"Fev/26","q":"Q1","conc":"","dias":5,"plan":22148,"prod":22147,"desc":1,"tEstE4":14.77,"tRealE4a":17.8,"pnp":null,"oee":{"rot1":0.69,"rot2":0.69,"esteira":0.83,"bla":0.69,"unit":0.69},"desvAb":0,"desvAtras":0,"diarios":[{"d":"09/fev","est":6000,"real":3554,"desc":1,"tE":0.099,"tR":0.288,"efPrev":21,"ausP":2,"efReal":19},{"d":"10/fev","est":6000,"real":4694,"desc":0,"tE":0.13,"tR":0.212,"efPrev":21,"ausP":2,"efReal":19},{"d":"11/fev","est":6000,"real":7500,"desc":0,"tE":0.208,"tR":0.324,"efPrev":21,"ausP":2,"efReal":19},{"d":"12/fev","est":6000,"real":5663,"desc":0,"tE":0.157,"tR":0.283,"efPrev":21,"ausP":2,"efReal":17},{"d":"13/fev","est":736,"real":736,"desc":0,"tE":0.02,"tR":0.094,"efPrev":21,"ausP":2,"efReal":19}]},{"id":"261001B002","per":"19–24/fev","mes":"Fev/26","q":"Q1","conc":"","dias":4,"plan":21723,"prod":21718,"desc":5,"tEstE4":14.48,"tRealE4a":16.73,"pnp":null,"oee":{"rot1":0.72,"rot2":0.72,"esteira":0.86,"bla":0.72,"unit":0.72},"desvAb":0,"desvAtras":0,"diarios":[{"d":"19/fev","est":6000,"real":1223,"desc":5,"tE":0.034,"tR":0.063,"efPrev":21,"ausP":3,"efReal":18},{"d":"20/fev","est":6000,"real":6197,"desc":0,"tE":0.172,"tR":0.291,"efPrev":21,"ausP":2,"efReal":18},{"d":"23/fev","est":6000,"real":7100,"desc":0,"tE":0.197,"tR":0.303,"efPrev":21,"ausP":1,"efReal":20},{"d":"24/fev","est":6000,"real":7198,"desc":0,"tE":0.2,"tR":0.305,"efPrev":21,"ausP":3,"efReal":18}]},{"id":"261001C002","per":"26/fev–04/mar","mes":"Fev/26","q":"Q1","conc":"","dias":5,"plan":22125,"prod":22120,"desc":5,"tEstE4":14.75,"tRealE4a":23.27,"pnp":null,"oee":{"rot1":0.53,"rot2":0.53,"esteira":0.63,"bla":0.53,"unit":0.53},"desvAb":0,"desvAtras":0,"diarios":[{"d":"26/fev","est":6000,"real":5748,"desc":5,"tE":0.16,"tR":0.299,"efPrev":21,"ausP":1,"efReal":19},{"d":"27/fev","est":6000,"real":4776,"desc":0,"tE":0.133,"tR":0.311,"efPrev":21,"ausP":1,"efReal":18},{"d":"02/mar","est":6000,"real":5196,"desc":0,"tE":0.144,"tR":0.306,"efPrev":21,"ausP":1,"efReal":20},{"d":"03/mar","est":6000,"real":5400,"desc":0,"tE":0.15,"tR":0.302,"efPrev":21,"ausP":1,"efReal":19},{"d":"04/mar","est":1000,"real":1000,"desc":0,"tE":0.028,"tR":0.114,"efPrev":21,"ausP":2,"efReal":17}]},{"id":"261001B003","per":"27/mar–01/abr","mes":"Mar/26","q":"Q1","conc":"","dias":4,"plan":21725,"prod":21722,"desc":3,"tEstE4":14.48,"tRealE4a":24.95,"pnp":3.72,"oee":{"rot1":0.54,"rot2":0.54,"esteira":0.65,"bla":0.54,"unit":0.54},"desvAb":0,"desvAtras":0,"diarios":[{"d":"27/mar","est":6000,"real":6723,"desc":3,"tE":0.187,"tR":0.332,"efPrev":21,"ausP":2,"efReal":18},{"d":"30/mar","est":6000,"real":8199,"desc":0,"tE":0.228,"tR":0.335,"efPrev":21,"ausP":2,"efReal":19},{"d":"31/mar","est":6000,"real":3740,"desc":0,"tE":0.104,"tR":0.353,"efPrev":21,"ausP":1,"efReal":20},{"d":"01/abr","est":3000,"real":3060,"desc":0,"tE":0.085,"tR":0.117,"efPrev":21,"ausP":1,"efReal":20}]},{"id":"261001A002","per":"14–20/abr","mes":"Abr/26","q":"Q2","conc":"250 UI","dias":5,"plan":22042,"prod":22039,"desc":3,"tEstE4":14.7,"tRealE4a":26.35,"pnp":4.08,"oee":{"rot1":0.46,"rot2":0.46,"esteira":0.56,"bla":0.46,"unit":0.46},"desvAb":1,"desvAtras":1,"diarios":[{"d":"14/abr","est":6000,"real":1742,"desc":3,"tE":0.048,"tR":0.072,"efPrev":21,"ausP":1,"efReal":19},{"d":"15/abr","est":6000,"real":6300,"desc":0,"tE":0.175,"tR":0.351,"efPrev":21,"ausP":2,"efReal":18},{"d":"16/abr","est":6000,"real":8499,"desc":0,"tE":0.236,"tR":0.351,"efPrev":21,"ausP":3,"efReal":18},{"d":"17/abr","est":6000,"real":4347,"desc":0,"tE":0.121,"tR":0.351,"efPrev":21,"ausP":1,"efReal":19},{"d":"20/abr","est":1042,"real":1151,"desc":0,"tE":0.032,"tR":0.284,"efPrev":21,"ausP":2,"efReal":18}]},{"id":"261001C003","per":"01–07/abr","mes":"Abr/26","q":"Q2","conc":"","dias":4,"plan":22129,"prod":22126,"desc":3,"tEstE4":14.75,"tRealE4a":22.1,"pnp":4.37,"oee":{"rot1":0.56,"rot2":0.56,"esteira":0.67,"bla":0.56,"unit":0.56},"desvAb":0,"desvAtras":0,"diarios":[{"d":"01/abr","est":6000,"real":3229,"desc":3,"tE":0.09,"tR":0.133,"efPrev":21,"ausP":1,"efReal":20},{"d":"02/abr","est":6000,"real":8700,"desc":0,"tE":0.242,"tR":0.36,"efPrev":21,"ausP":1,"efReal":19},{"d":"04/abr","est":6000,"real":7297,"desc":0,"tE":0.203,"tR":0.357,"efPrev":21,"ausP":3,"efReal":18},{"d":"07/abr","est":3129,"real":2900,"desc":0,"tE":0.081,"tR":0.169,"efPrev":21,"ausP":3,"efReal":11}]},{"id":"261001D002","per":"08–13/abr","mes":"Abr/26","q":"Q2","conc":"","dias":4,"plan":21980,"prod":21978,"desc":2,"tEstE4":14.65,"tRealE4a":22.98,"pnp":4.8,"oee":{"rot1":0.53,"rot2":0.53,"esteira":0.64,"bla":0.53,"unit":0.53},"desvAb":0,"desvAtras":0,"diarios":[{"d":"08/abr","est":6000,"real":4580,"desc":2,"tE":0.127,"tR":0.238,"efPrev":21,"ausP":3,"efReal":17},{"d":"09/abr","est":6000,"real":7700,"desc":0,"tE":0.214,"tR":0.351,"efPrev":21,"ausP":3,"efReal":17},{"d":"10/abr","est":6000,"real":8499,"desc":0,"tE":0.236,"tR":0.353,"efPrev":21,"ausP":3,"efReal":17},{"d":"13/abr","est":1980,"real":1199,"desc":0,"tE":0.033,"tR":0.126,"efPrev":21,"ausP":1,"efReal":19}]},{"id":"261001B004","per":"05–11/mai","mes":"Mai/26","q":"Q2","conc":"500 UI","dias":5,"plan":22023,"prod":22022,"desc":1,"tEstE4":14.68,"tRealE4a":26.13,"pnp":6.73,"oee":{"rot1":0.47,"rot2":0.47,"esteira":0.56,"bla":0.47,"unit":0.47},"desvAb":0,"desvAtras":0,"diarios":[{"d":"05/mai","est":6000,"real":2849,"desc":1,"tE":0.079,"tR":0.267,"efPrev":21,"ausP":2,"efReal":18},{"d":"06/mai","est":6000,"real":4974,"desc":0,"tE":0.138,"tR":0.306,"efPrev":21,"ausP":2,"efReal":19},{"d":"07/mai","est":6000,"real":5400,"desc":0,"tE":0.15,"tR":0.31,"efPrev":21,"ausP":1,"efReal":20},{"d":"08/mai","est":6000,"real":3877,"desc":0,"tE":0.108,"tR":0.309,"efPrev":21,"ausP":2,"efReal":18},{"d":"11/mai","est":6000,"real":4922,"desc":0,"tE":0.137,"tR":0.306,"efPrev":21,"ausP":1,"efReal":19}]},{"id":"261001B005","per":"26–28/mai","mes":"Mai/26","q":"Q2","conc":"500 UI","dias":5,"plan":19802,"prod":19802,"desc":0,"tEstE4":13.2,"tRealE4a":19.27,"pnp":4.57,"oee":{"rot1":0.571,"rot2":0.571,"esteira":0.685,"bla":0.57,"unit":0.57},"desvAb":0,"desvAtras":0,"diarios":[{"d":"26/mai-2T","est":6000,"real":190,"desc":0,"tE":0.005,"tR":0.045,"efPrev":15,"ausP":1,"efReal":14},{"d":"27/mai-1T","est":6000,"real":6001,"desc":0,"tE":0.167,"tR":0.323,"efPrev":21,"ausP":1,"efReal":20},{"d":"27/mai-2T","est":6000,"real":5021,"desc":0,"tE":0.139,"tR":0.272,"efPrev":15,"ausP":0,"efReal":15},{"d":"28/mai-1T","est":6000,"real":6001,"desc":0,"tE":0.167,"tR":0.335,"efPrev":21,"ausP":1,"efReal":20},{"d":"28/mai-2T","est":1802,"real":2589,"desc":0,"tE":0.072,"tR":0.121,"efPrev":15,"ausP":0,"efReal":15}]},{"id":"261001C004","per":"20–26/mai","mes":"Mai/26","q":"Q2","conc":"1000 UI","dias":5,"plan":22015,"prod":22011,"desc":4,"tEstE4":14.67,"tRealE4a":31.97,"pnp":12.48,"oee":{"rot1":0.383,"rot2":0.383,"esteira":0.459,"bla":0.383,"unit":0.383},"desvAb":0,"desvAtras":0,"diarios":[{"d":"20/mai","est":6000,"real":515,"desc":4,"tE":0.014,"tR":0.181,"efPrev":21,"ausP":1,"efReal":20},{"d":"21/mai","est":6000,"real":5497,"desc":0,"tE":0.153,"tR":0.339,"efPrev":21,"ausP":1,"efReal":20},{"d":"22/mai","est":6000,"real":4999,"desc":0,"tE":0.139,"tR":0.352,"efPrev":21,"ausP":1,"efReal":20},{"d":"23/mai","est":6000,"real":5400,"desc":0,"tE":0.15,"tR":0.352,"efPrev":21,"ausP":2,"efReal":19},{"d":"26/mai","est":6000,"real":5600,"desc":0,"tE":0.156,"tR":0.372,"efPrev":21,"ausP":1,"efReal":20}]},{"id":"261001B006","per":"03-08/jun","mes":"Jun/26","q":"Q2","conc":"500 UI","dias":5,"plan":21938,"prod":21934,"desc":4,"tEstE4":14.61,"tRealE4a":25.78,"pnp":8.33,"oee":{"rot1":0.473,"rot2":0.473,"esteira":0.567,"bla":0.473,"unit":0.473},"desvAb":0,"desvAtras":0,"diarios":[{"d":"03-08/jun","est":21938,"real":21934,"desc":4,"tE":0.60875,"tR":1.074167,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001B008","per":"11-16/jun","mes":"Jun/26","q":"Q2","conc":"500 UI","dias":4,"plan":22119,"prod":22114,"desc":5,"tEstE4":14.73,"tRealE4a":27.93,"pnp":9.48,"oee":{"rot1":0.44,"rot2":0.44,"esteira":0.528,"bla":0.44,"unit":0.44},"desvAb":0,"desvAtras":0,"diarios":[{"d":"11-16/jun","est":22119,"real":22114,"desc":5,"tE":0.61375,"tR":1.16375,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001C006","per":"18-25/Jun","mes":"Jun/26","q":"Q2","conc":"1000 UI","dias":4,"plan":21951,"prod":21950,"desc":1,"tEstE4":14.63,"tRealE4a":17.23,"pnp":3.13,"oee":{"rot1":0.708,"rot2":0.708,"esteira":0.849,"bla":0.708,"unit":0.708},"desvAb":0,"desvAtras":0,"diarios":[{"d":"18-25/Jun","est":21951,"real":21950,"desc":1,"tE":0.609583,"tR":0.717917,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001D003","per":"26/Jun-03/Jul","mes":"Jun/26","q":"Q2","conc":"1500 UI","dias":6,"plan":22024,"prod":22014,"desc":10,"tEstE4":14.66,"tRealE4a":38.76,"pnp":9.97,"oee":{"rot1":0.316,"rot2":0.316,"esteira":0.379,"bla":0.316,"unit":0.316},"desvAb":1,"desvAtras":1,"diarios":[{"d":"26/Jun-03/Jul","est":22024,"real":22014,"desc":10,"tE":0.610833,"tR":1.615,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001B007","per":"07-10/Jul","mes":"Jul/26","q":"Q3","conc":"500 UI","dias":4,"plan":21926,"prod":21923,"desc":3,"tEstE4":14.6,"tRealE4a":20.55,"pnp":3.67,"oee":{"rot1":0.736,"rot2":0.736,"esteira":0.883,"bla":0.736,"unit":0.736},"desvAb":0,"desvAtras":0,"diarios":[{"d":"07-10/Jul","est":21926,"real":21923,"desc":3,"tE":0.608333,"tR":0.85625,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001B009","per":"20-23/jul","mes":"Jul/26","q":"Q3","conc":"500 UI","dias":4,"plan":21834,"prod":21830,"desc":4,"tEstE4":14.55,"tRealE4a":25.3,"pnp":3.5,"oee":{"rot1":0.741,"rot2":0.607,"esteira":0.728,"bla":0.623,"unit":0.595},"desvAb":0,"desvAtras":0,"diarios":[{"d":"20/jul","est":6000,"real":2734,"desc":0,"tE":0.075833,"tR":0.194583,"efPrev":21,"ausP":0,"efReal":20},{"d":"21/jul","est":6000,"real":7100,"desc":4,"tE":0.197083,"tR":0.307083,"efPrev":21,"ausP":0,"efReal":19},{"d":"22/jul","est":6000,"real":7796,"desc":0,"tE":0.215833,"tR":0.330417,"efPrev":21,"ausP":0,"efReal":20},{"d":"23/jul","est":6000,"real":4200,"desc":0,"tE":0.116667,"tR":0.222083,"efPrev":21,"ausP":0,"efReal":20}]},{"id":"261001C005","per":"13-16/jul","mes":"Jul/26","q":"Q3","conc":"1000 UI","dias":4,"plan":21972,"prod":21970,"desc":2,"tEstE4":14.63,"tRealE4a":24.2,"pnp":2.63,"oee":{"rot1":0.604,"rot2":0.604,"esteira":0.725,"bla":0.604,"unit":0.604},"desvAb":1,"desvAtras":0,"diarios":[{"d":"13/jul","est":6000,"real":1971,"desc":0,"tE":0.054167,"tR":0.084167,"efPrev":21,"ausP":2,"efReal":17},{"d":"14/jul","est":6000,"real":7000,"desc":0,"tE":0.194583,"tR":0.308333,"efPrev":21,"ausP":0,"efReal":19},{"d":"15/jul","est":6000,"real":6800,"desc":2,"tE":0.18875,"tR":0.31375,"efPrev":21,"ausP":0,"efReal":19},{"d":"16/jul","est":6000,"real":6199,"desc":0,"tE":0.171667,"tR":0.302083,"efPrev":21,"ausP":0,"efReal":20}]},{"id":"261001B010","per":"03-10/Ago","mes":"Ago/26","q":"Q3","conc":"500 UI","dias":6,"plan":21784,"prod":21778,"desc":6,"tEstE4":14.52,"tRealE4a":38.63,"pnp":12.83,"oee":{"rot1":0.463,"rot2":0.412,"esteira":0.46,"bla":0.39,"unit":0.416},"desvAb":0,"desvAtras":0,"diarios":[{"d":"03/Ago","est":6000,"real":961,"desc":0,"tE":0.02625,"tR":0.10625,"efPrev":21,"ausP":1,"efReal":17},{"d":"04/Ago","est":6000,"real":4522,"desc":0,"tE":0.125,"tR":0.297083,"efPrev":21,"ausP":1,"efReal":20},{"d":"05/Ago","est":6000,"real":4221,"desc":0,"tE":0.116667,"tR":0.302083,"efPrev":21,"ausP":1,"efReal":19},{"d":"06/Ago","est":6000,"real":5501,"desc":6,"tE":0.152917,"tR":0.311667,"efPrev":21,"ausP":1,"efReal":20},{"d":"07/Ago","est":6000,"real":1788,"desc":0,"tE":0.049167,"tR":0.282083,"efPrev":21,"ausP":1,"efReal":20},{"d":"10/Ago","est":6000,"real":4785,"desc":0,"tE":0.049167,"tR":0.310417,"efPrev":21,"ausP":1,"efReal":19}]},{"id":"261001B011","per":"19-24/Ago","mes":"Ago/26","q":"Q3","conc":"500 UI","dias":4,"plan":21707,"prod":21705,"desc":2,"tEstE4":14.47,"tRealE4a":28.78,"pnp":7.85,"oee":{"rot1":0.5128,"rot2":0.5117,"esteira":0.6012,"bla":0.512,"unit":0.5138},"desvAb":0,"desvAtras":0,"diarios":[{"d":"19/ago","est":6000,"real":5296,"desc":0,"tE":0.146667,"tR":0.295,"efPrev":21,"ausP":0,"efReal":21},{"d":"20/ago","est":6000,"real":5617,"desc":0,"tE":0.155417,"tR":0.305417,"efPrev":21,"ausP":0,"efReal":20},{"d":"21/ago","est":6000,"real":5592,"desc":2,"tE":0.154583,"tR":0.314583,"efPrev":21,"ausP":0,"efReal":19},{"d":"24/ago","est":6000,"real":5200,"desc":0,"tE":0.144167,"tR":0.28125,"efPrev":21,"ausP":0,"efReal":20}]},{"id":"261001D004","per":"12-17/Ago","mes":"Ago/26","q":"Q3","conc":"1500 UI","dias":4,"plan":22018,"prod":22015,"desc":3,"tEstE4":14.67,"tRealE4a":29.17,"pnp":6.75,"oee":{"rot1":0.514,"rot2":0.494,"esteira":0.618,"bla":0.529,"unit":0.514},"desvAb":1,"desvAtras":0,"diarios":[{"d":"12/Ago","est":6000,"real":5751,"desc":0,"tE":0.159583,"tR":0.295,"efPrev":21,"ausP":1,"efReal":20},{"d":"13/Ago","est":6000,"real":5580,"desc":0,"tE":0.155,"tR":0.305,"efPrev":21,"ausP":3,"efReal":18},{"d":"14/Ago","est":6000,"real":6184,"desc":0,"tE":0.171667,"tR":0.317917,"efPrev":21,"ausP":2,"efReal":19},{"d":"17/Ago","est":6000,"real":4500,"desc":3,"tE":0.125,"tR":0.297083,"efPrev":21,"ausP":1,"efReal":20}]}]</script>
+<script type="application/json" id="lotesData">[{"id":"261001B001","per":"13–19/jan","mes":"Jan/26","q":"Q1","conc":"","dias":5,"plan":22148,"prod":22144,"desc":4,"tEstE4":14.73,"tRealE4a":18.2,"pnp":null,"oee":null,"desvAb":0,"desvAtras":0,"diarios":[{"d":"13/jan","est":6000,"real":1547,"desc":4,"tE":0.042,"tR":0.065,"efPrev":21,"ausP":3,"efReal":18},{"d":"14/jan","est":6000,"real":6099,"desc":0,"tE":0.169,"tR":0.368,"efPrev":21,"ausP":3,"efReal":18},{"d":"15/jan","est":6000,"real":6400,"desc":0,"tE":0.178,"tR":0.293,"efPrev":21,"ausP":0,"efReal":20},{"d":"16/jan","est":6000,"real":5815,"desc":0,"tE":0.161,"tR":0.309,"efPrev":21,"ausP":0,"efReal":21},{"d":"19/jan","est":2283,"real":2283,"desc":0,"tE":0.063,"tR":0.126,"efPrev":21,"ausP":2,"efReal":18}]},{"id":"261001C001","per":"20–27/jan","mes":"Jan/26","q":"Q1","conc":"","dias":6,"plan":22070,"prod":22065,"desc":5,"tEstE4":14.72,"tRealE4a":17.4,"pnp":null,"oee":null,"desvAb":0,"desvAtras":0,"diarios":[{"d":"20/jan","est":6000,"real":0,"desc":5,"tE":0,"tR":0,"efPrev":21,"ausP":1,"efReal":20},{"d":"21/jan","est":6000,"real":2869,"desc":0,"tE":0.08,"tR":0.208,"efPrev":21,"ausP":1,"efReal":19},{"d":"22/jan","est":6000,"real":6399,"desc":0,"tE":0.178,"tR":0.311,"efPrev":21,"ausP":0,"efReal":18},{"d":"23/jan","est":6000,"real":4799,"desc":0,"tE":0.133,"tR":0.318,"efPrev":21,"ausP":1,"efReal":18},{"d":"26/jan","est":6000,"real":2799,"desc":0,"tE":0.078,"tR":0.3,"efPrev":21,"ausP":0,"efReal":18},{"d":"27/jan","est":5199,"real":5199,"desc":0,"tE":0.144,"tR":0.276,"efPrev":21,"ausP":2,"efReal":19}]},{"id":"261001D001","per":"06–12/jan","mes":"Jan/26","q":"Q1","conc":"","dias":5,"plan":21880,"prod":21850,"desc":30,"tEstE4":14.58,"tRealE4a":19.92,"pnp":null,"oee":null,"desvAb":0,"desvAtras":0,"diarios":[{"d":"06/jan","est":6000,"real":1478,"desc":30,"tE":0.042,"tR":0.072,"efPrev":21,"ausP":1,"efReal":19},{"d":"07/jan","est":6000,"real":4289,"desc":0,"tE":0.119,"tR":0.302,"efPrev":21,"ausP":1,"efReal":20},{"d":"08/jan","est":6000,"real":7095,"desc":0,"tE":0.197,"tR":0.317,"efPrev":21,"ausP":1,"efReal":19},{"d":"09/jan","est":6000,"real":5791,"desc":0,"tE":0.161,"tR":0.315,"efPrev":21,"ausP":1,"efReal":19},{"d":"12/jan","est":3197,"real":3197,"desc":0,"tE":0.089,"tR":0.266,"efPrev":21,"ausP":1,"efReal":20}]},{"id":"261001A001","per":"09–13/fev","mes":"Fev/26","q":"Q1","conc":"","dias":5,"plan":22148,"prod":22147,"desc":1,"tEstE4":14.77,"tRealE4a":17.8,"pnp":null,"oee":{"rot1":0.69,"rot2":0.69,"esteira":0.83,"bla":0.69,"unit":0.69},"desvAb":0,"desvAtras":0,"diarios":[{"d":"09/fev","est":6000,"real":3554,"desc":1,"tE":0.099,"tR":0.288,"efPrev":21,"ausP":2,"efReal":19},{"d":"10/fev","est":6000,"real":4694,"desc":0,"tE":0.13,"tR":0.212,"efPrev":21,"ausP":2,"efReal":19},{"d":"11/fev","est":6000,"real":7500,"desc":0,"tE":0.208,"tR":0.324,"efPrev":21,"ausP":2,"efReal":19},{"d":"12/fev","est":6000,"real":5663,"desc":0,"tE":0.157,"tR":0.283,"efPrev":21,"ausP":2,"efReal":17},{"d":"13/fev","est":736,"real":736,"desc":0,"tE":0.02,"tR":0.094,"efPrev":21,"ausP":2,"efReal":19}]},{"id":"261001B002","per":"19–24/fev","mes":"Fev/26","q":"Q1","conc":"","dias":4,"plan":21723,"prod":21718,"desc":5,"tEstE4":14.48,"tRealE4a":16.73,"pnp":null,"oee":{"rot1":0.72,"rot2":0.72,"esteira":0.86,"bla":0.72,"unit":0.72},"desvAb":0,"desvAtras":0,"diarios":[{"d":"19/fev","est":6000,"real":1223,"desc":5,"tE":0.034,"tR":0.063,"efPrev":21,"ausP":3,"efReal":18},{"d":"20/fev","est":6000,"real":6197,"desc":0,"tE":0.172,"tR":0.291,"efPrev":21,"ausP":2,"efReal":18},{"d":"23/fev","est":6000,"real":7100,"desc":0,"tE":0.197,"tR":0.303,"efPrev":21,"ausP":1,"efReal":20},{"d":"24/fev","est":6000,"real":7198,"desc":0,"tE":0.2,"tR":0.305,"efPrev":21,"ausP":3,"efReal":18}]},{"id":"261001C002","per":"26/fev–04/mar","mes":"Fev/26","q":"Q1","conc":"","dias":5,"plan":22125,"prod":22120,"desc":5,"tEstE4":14.75,"tRealE4a":23.27,"pnp":null,"oee":{"rot1":0.53,"rot2":0.53,"esteira":0.63,"bla":0.53,"unit":0.53},"desvAb":0,"desvAtras":0,"diarios":[{"d":"26/fev","est":6000,"real":5748,"desc":5,"tE":0.16,"tR":0.299,"efPrev":21,"ausP":1,"efReal":19},{"d":"27/fev","est":6000,"real":4776,"desc":0,"tE":0.133,"tR":0.311,"efPrev":21,"ausP":1,"efReal":18},{"d":"02/mar","est":6000,"real":5196,"desc":0,"tE":0.144,"tR":0.306,"efPrev":21,"ausP":1,"efReal":20},{"d":"03/mar","est":6000,"real":5400,"desc":0,"tE":0.15,"tR":0.302,"efPrev":21,"ausP":1,"efReal":19},{"d":"04/mar","est":1000,"real":1000,"desc":0,"tE":0.028,"tR":0.114,"efPrev":21,"ausP":2,"efReal":17}]},{"id":"261001B003","per":"27/mar–01/abr","mes":"Mar/26","q":"Q1","conc":"","dias":4,"plan":21725,"prod":21722,"desc":3,"tEstE4":14.48,"tRealE4a":24.95,"pnp":3.72,"oee":{"rot1":0.54,"rot2":0.54,"esteira":0.65,"bla":0.54,"unit":0.54},"desvAb":0,"desvAtras":0,"diarios":[{"d":"27/mar","est":6000,"real":6723,"desc":3,"tE":0.187,"tR":0.332,"efPrev":21,"ausP":2,"efReal":18},{"d":"30/mar","est":6000,"real":8199,"desc":0,"tE":0.228,"tR":0.335,"efPrev":21,"ausP":2,"efReal":19},{"d":"31/mar","est":6000,"real":3740,"desc":0,"tE":0.104,"tR":0.353,"efPrev":21,"ausP":1,"efReal":20},{"d":"01/abr","est":3000,"real":3060,"desc":0,"tE":0.085,"tR":0.117,"efPrev":21,"ausP":1,"efReal":20}]},{"id":"261001A002","per":"14–20/abr","mes":"Abr/26","q":"Q2","conc":"250 UI","dias":5,"plan":22042,"prod":22039,"desc":3,"tEstE4":14.7,"tRealE4a":26.35,"pnp":4.08,"oee":{"rot1":0.46,"rot2":0.46,"esteira":0.56,"bla":0.46,"unit":0.46},"desvAb":1,"desvAtras":1,"diarios":[{"d":"14/abr","est":6000,"real":1742,"desc":3,"tE":0.048,"tR":0.072,"efPrev":21,"ausP":1,"efReal":19},{"d":"15/abr","est":6000,"real":6300,"desc":0,"tE":0.175,"tR":0.351,"efPrev":21,"ausP":2,"efReal":18},{"d":"16/abr","est":6000,"real":8499,"desc":0,"tE":0.236,"tR":0.351,"efPrev":21,"ausP":3,"efReal":18},{"d":"17/abr","est":6000,"real":4347,"desc":0,"tE":0.121,"tR":0.351,"efPrev":21,"ausP":1,"efReal":19},{"d":"20/abr","est":1042,"real":1151,"desc":0,"tE":0.032,"tR":0.284,"efPrev":21,"ausP":2,"efReal":18}]},{"id":"261001C003","per":"01–07/abr","mes":"Abr/26","q":"Q2","conc":"","dias":4,"plan":22129,"prod":22126,"desc":3,"tEstE4":14.75,"tRealE4a":22.1,"pnp":4.37,"oee":{"rot1":0.56,"rot2":0.56,"esteira":0.67,"bla":0.56,"unit":0.56},"desvAb":0,"desvAtras":0,"diarios":[{"d":"01/abr","est":6000,"real":3229,"desc":3,"tE":0.09,"tR":0.133,"efPrev":21,"ausP":1,"efReal":20},{"d":"02/abr","est":6000,"real":8700,"desc":0,"tE":0.242,"tR":0.36,"efPrev":21,"ausP":1,"efReal":19},{"d":"04/abr","est":6000,"real":7297,"desc":0,"tE":0.203,"tR":0.357,"efPrev":21,"ausP":3,"efReal":18},{"d":"07/abr","est":3129,"real":2900,"desc":0,"tE":0.081,"tR":0.169,"efPrev":21,"ausP":3,"efReal":11}]},{"id":"261001D002","per":"08–13/abr","mes":"Abr/26","q":"Q2","conc":"","dias":4,"plan":21980,"prod":21978,"desc":2,"tEstE4":14.65,"tRealE4a":22.98,"pnp":4.8,"oee":{"rot1":0.53,"rot2":0.53,"esteira":0.64,"bla":0.53,"unit":0.53},"desvAb":0,"desvAtras":0,"diarios":[{"d":"08/abr","est":6000,"real":4580,"desc":2,"tE":0.127,"tR":0.238,"efPrev":21,"ausP":3,"efReal":17},{"d":"09/abr","est":6000,"real":7700,"desc":0,"tE":0.214,"tR":0.351,"efPrev":21,"ausP":3,"efReal":17},{"d":"10/abr","est":6000,"real":8499,"desc":0,"tE":0.236,"tR":0.353,"efPrev":21,"ausP":3,"efReal":17},{"d":"13/abr","est":1980,"real":1199,"desc":0,"tE":0.033,"tR":0.126,"efPrev":21,"ausP":1,"efReal":19}]},{"id":"261001B004","per":"05–11/mai","mes":"Mai/26","q":"Q2","conc":"500 UI","dias":5,"plan":22023,"prod":22022,"desc":1,"tEstE4":14.68,"tRealE4a":26.13,"pnp":6.73,"oee":{"rot1":0.47,"rot2":0.47,"esteira":0.56,"bla":0.47,"unit":0.47},"desvAb":0,"desvAtras":0,"diarios":[{"d":"05/mai","est":6000,"real":2849,"desc":1,"tE":0.079,"tR":0.267,"efPrev":21,"ausP":2,"efReal":18},{"d":"06/mai","est":6000,"real":4974,"desc":0,"tE":0.138,"tR":0.306,"efPrev":21,"ausP":2,"efReal":19},{"d":"07/mai","est":6000,"real":5400,"desc":0,"tE":0.15,"tR":0.31,"efPrev":21,"ausP":1,"efReal":20},{"d":"08/mai","est":6000,"real":3877,"desc":0,"tE":0.108,"tR":0.309,"efPrev":21,"ausP":2,"efReal":18},{"d":"11/mai","est":6000,"real":4922,"desc":0,"tE":0.137,"tR":0.306,"efPrev":21,"ausP":1,"efReal":19}]},{"id":"261001B005","per":"26–28/mai","mes":"Mai/26","q":"Q2","conc":"500 UI","dias":5,"plan":19802,"prod":19802,"desc":0,"tEstE4":13.2,"tRealE4a":19.27,"pnp":4.57,"oee":{"rot1":0.571,"rot2":0.571,"esteira":0.685,"bla":0.57,"unit":0.57},"desvAb":0,"desvAtras":0,"diarios":[{"d":"26/mai-2T","est":6000,"real":190,"desc":0,"tE":0.005,"tR":0.045,"efPrev":15,"ausP":1,"efReal":14},{"d":"27/mai-1T","est":6000,"real":6001,"desc":0,"tE":0.167,"tR":0.323,"efPrev":21,"ausP":1,"efReal":20},{"d":"27/mai-2T","est":6000,"real":5021,"desc":0,"tE":0.139,"tR":0.272,"efPrev":15,"ausP":0,"efReal":15},{"d":"28/mai-1T","est":6000,"real":6001,"desc":0,"tE":0.167,"tR":0.335,"efPrev":21,"ausP":1,"efReal":20},{"d":"28/mai-2T","est":1802,"real":2589,"desc":0,"tE":0.072,"tR":0.121,"efPrev":15,"ausP":0,"efReal":15}]},{"id":"261001C004","per":"20–26/mai","mes":"Mai/26","q":"Q2","conc":"1000 UI","dias":5,"plan":22015,"prod":22011,"desc":4,"tEstE4":14.67,"tRealE4a":31.97,"pnp":12.48,"oee":{"rot1":0.383,"rot2":0.383,"esteira":0.459,"bla":0.383,"unit":0.383},"desvAb":0,"desvAtras":0,"diarios":[{"d":"20/mai","est":6000,"real":515,"desc":4,"tE":0.014,"tR":0.181,"efPrev":21,"ausP":1,"efReal":20},{"d":"21/mai","est":6000,"real":5497,"desc":0,"tE":0.153,"tR":0.339,"efPrev":21,"ausP":1,"efReal":20},{"d":"22/mai","est":6000,"real":4999,"desc":0,"tE":0.139,"tR":0.352,"efPrev":21,"ausP":1,"efReal":20},{"d":"23/mai","est":6000,"real":5400,"desc":0,"tE":0.15,"tR":0.352,"efPrev":21,"ausP":2,"efReal":19},{"d":"26/mai","est":6000,"real":5600,"desc":0,"tE":0.156,"tR":0.372,"efPrev":21,"ausP":1,"efReal":20}]},{"id":"261001B006","per":"03-08/jun","mes":"Jun/26","q":"Q2","conc":"500 UI","dias":5,"plan":21938,"prod":21934,"desc":4,"tEstE4":14.61,"tRealE4a":25.78,"pnp":8.33,"oee":{"rot1":0.473,"rot2":0.473,"esteira":0.567,"bla":0.473,"unit":0.473},"desvAb":0,"desvAtras":0,"diarios":[{"d":"03-08/jun","est":21938,"real":21934,"desc":4,"tE":0.60875,"tR":1.074167,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001B008","per":"11-16/jun","mes":"Jun/26","q":"Q2","conc":"500 UI","dias":4,"plan":22119,"prod":22114,"desc":5,"tEstE4":14.73,"tRealE4a":27.93,"pnp":9.48,"oee":{"rot1":0.44,"rot2":0.44,"esteira":0.528,"bla":0.44,"unit":0.44},"desvAb":0,"desvAtras":0,"diarios":[{"d":"11-16/jun","est":22119,"real":22114,"desc":5,"tE":0.61375,"tR":1.16375,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001C006","per":"18-25/Jun","mes":"Jun/26","q":"Q2","conc":"1000 UI","dias":4,"plan":21951,"prod":21950,"desc":1,"tEstE4":14.63,"tRealE4a":17.23,"pnp":3.13,"oee":{"rot1":0.708,"rot2":0.708,"esteira":0.849,"bla":0.708,"unit":0.708},"desvAb":0,"desvAtras":0,"diarios":[{"d":"18-25/Jun","est":21951,"real":21950,"desc":1,"tE":0.609583,"tR":0.717917,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001D003","per":"26/Jun-03/Jul","mes":"Jun/26","q":"Q2","conc":"1500 UI","dias":6,"plan":22024,"prod":22014,"desc":10,"tEstE4":14.66,"tRealE4a":38.76,"pnp":9.97,"oee":{"rot1":0.316,"rot2":0.316,"esteira":0.379,"bla":0.316,"unit":0.316},"desvAb":1,"desvAtras":1,"diarios":[{"d":"26/Jun-03/Jul","est":22024,"real":22014,"desc":10,"tE":0.610833,"tR":1.615,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001B007","per":"07-10/Jul","mes":"Jul/26","q":"Q3","conc":"500 UI","dias":4,"plan":21926,"prod":21923,"desc":3,"tEstE4":14.6,"tRealE4a":20.55,"pnp":3.67,"oee":{"rot1":0.736,"rot2":0.736,"esteira":0.883,"bla":0.736,"unit":0.736},"desvAb":0,"desvAtras":0,"diarios":[{"d":"07-10/Jul","est":21926,"real":21923,"desc":3,"tE":0.608333,"tR":0.85625,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001B009","per":"20-23/jul","mes":"Jul/26","q":"Q3","conc":"500 UI","dias":4,"plan":21834,"prod":21830,"desc":4,"tEstE4":14.55,"tRealE4a":25.3,"pnp":3.5,"oee":{"rot1":0.741,"rot2":0.607,"esteira":0.728,"bla":0.623,"unit":0.595},"desvAb":0,"desvAtras":0,"diarios":[{"d":"20/jul","est":6000,"real":2734,"desc":0,"tE":0.075833,"tR":0.194583,"efPrev":21,"ausP":0,"efReal":20},{"d":"21/jul","est":6000,"real":7100,"desc":4,"tE":0.197083,"tR":0.307083,"efPrev":21,"ausP":0,"efReal":19},{"d":"22/jul","est":6000,"real":7796,"desc":0,"tE":0.215833,"tR":0.330417,"efPrev":21,"ausP":0,"efReal":20},{"d":"23/jul","est":6000,"real":4200,"desc":0,"tE":0.116667,"tR":0.222083,"efPrev":21,"ausP":0,"efReal":20}]},{"id":"261001C005","per":"13-16/jul","mes":"Jul/26","q":"Q3","conc":"1000 UI","dias":4,"plan":21972,"prod":21970,"desc":2,"tEstE4":14.63,"tRealE4a":24.2,"pnp":2.63,"oee":{"rot1":0.604,"rot2":0.604,"esteira":0.725,"bla":0.604,"unit":0.604},"desvAb":1,"desvAtras":0,"diarios":[{"d":"13/jul","est":6000,"real":1971,"desc":0,"tE":0.054167,"tR":0.084167,"efPrev":21,"ausP":2,"efReal":17},{"d":"14/jul","est":6000,"real":7000,"desc":0,"tE":0.194583,"tR":0.308333,"efPrev":21,"ausP":0,"efReal":19},{"d":"15/jul","est":6000,"real":6800,"desc":2,"tE":0.18875,"tR":0.31375,"efPrev":21,"ausP":0,"efReal":19},{"d":"16/jul","est":6000,"real":6199,"desc":0,"tE":0.171667,"tR":0.302083,"efPrev":21,"ausP":0,"efReal":20}]},{"id":"261001B010","per":"03-10/Ago","mes":"Ago/26","q":"Q3","conc":"500 UI","dias":6,"plan":21784,"prod":21778,"desc":6,"tEstE4":14.52,"tRealE4a":38.63,"pnp":12.83,"oee":{"rot1":0.463,"rot2":0.412,"esteira":0.46,"bla":0.39,"unit":0.416},"desvAb":0,"desvAtras":0,"diarios":[{"d":"03/Ago","est":6000,"real":961,"desc":0,"tE":0.02625,"tR":0.10625,"efPrev":21,"ausP":1,"efReal":17},{"d":"04/Ago","est":6000,"real":4522,"desc":0,"tE":0.125,"tR":0.297083,"efPrev":21,"ausP":1,"efReal":20},{"d":"05/Ago","est":6000,"real":4221,"desc":0,"tE":0.116667,"tR":0.302083,"efPrev":21,"ausP":1,"efReal":19},{"d":"06/Ago","est":6000,"real":5501,"desc":6,"tE":0.152917,"tR":0.311667,"efPrev":21,"ausP":1,"efReal":20},{"d":"07/Ago","est":6000,"real":1788,"desc":0,"tE":0.049167,"tR":0.282083,"efPrev":21,"ausP":1,"efReal":20},{"d":"10/Ago","est":6000,"real":4785,"desc":0,"tE":0.049167,"tR":0.310417,"efPrev":21,"ausP":1,"efReal":19}]},{"id":"261001B011","per":"19-24/Ago","mes":"Ago/26","q":"Q3","conc":"500 UI","dias":4,"plan":21707,"prod":21705,"desc":2,"tEstE4":14.47,"tRealE4a":28.78,"pnp":7.85,"oee":{"rot1":0.513,"rot2":0.512,"esteira":0.601,"bla":0.512,"unit":0.514},"desvAb":0,"desvAtras":0,"diarios":[{"d":"19/ago","est":6000,"real":5296,"desc":0,"tE":0.146667,"tR":0.295,"efPrev":21,"ausP":0,"efReal":21},{"d":"20/ago","est":6000,"real":5617,"desc":0,"tE":0.155417,"tR":0.305417,"efPrev":21,"ausP":0,"efReal":20},{"d":"21/ago","est":6000,"real":5592,"desc":2,"tE":0.154583,"tR":0.314583,"efPrev":21,"ausP":0,"efReal":19},{"d":"24/ago","est":6000,"real":5200,"desc":0,"tE":0.144167,"tR":0.28125,"efPrev":21,"ausP":0,"efReal":20}]},{"id":"261001C007","per":"26/Ago-02/Set","mes":"Ago/26","q":"Q3","conc":"500 UI","dias":6,"plan":21939,"prod":21937,"desc":2,"tEstE4":14.62,"tRealE4a":36.77,"pnp":9.7,"oee":{"rot1":0.475,"rot2":0.471,"esteira":0.476,"bla":0.4,"unit":0.422},"desvAb":1,"desvAtras":0,"obs":"Alto índice de descarte de Baxject - avaria no insumo (DEV-SEE-0021-26);\nAlto índice de descarte de cartucho e baixo OEE da esteira — utilização de cartuchos com código 128.","diarios":[{"d":"26/08/2026","est":6000,"real":5138,"desc":0,"tE":0.1425,"tR":0.284583,"efPrev":21,"ausP":1,"efReal":19},{"d":"27/08/2026","est":6000,"real":5299,"desc":0,"tE":0.146667,"tR":0.309583,"efPrev":21,"ausP":0,"efReal":20},{"d":"28/08/2026","est":6000,"real":4900,"desc":0,"tE":0.13625,"tR":0.322083,"efPrev":21,"ausP":1,"efReal":19},{"d":"31/08/2026","est":6000,"real":4300,"desc":0,"tE":0.119583,"tR":0.3125,"efPrev":21,"ausP":2,"efReal":18},{"d":"01/09/2026","est":6000,"real":2229,"desc":0,"tE":0.061667,"tR":0.290833,"efPrev":21,"ausP":0,"efReal":21},{"d":"02/09/2026","est":73,"real":71,"desc":2,"tE":0.00125,"tR":0.011667,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001D004","per":"12-17/Ago","mes":"Ago/26","q":"Q3","conc":"1500 UI","dias":4,"plan":22018,"prod":22015,"desc":3,"tEstE4":14.67,"tRealE4a":29.17,"pnp":6.75,"oee":{"rot1":0.514,"rot2":0.494,"esteira":0.618,"bla":0.529,"unit":0.514},"desvAb":1,"desvAtras":0,"diarios":[{"d":"12/Ago","est":6000,"real":5751,"desc":0,"tE":0.159583,"tR":0.295,"efPrev":21,"ausP":1,"efReal":20},{"d":"13/Ago","est":6000,"real":5580,"desc":0,"tE":0.155,"tR":0.305,"efPrev":21,"ausP":3,"efReal":18},{"d":"14/Ago","est":6000,"real":6184,"desc":0,"tE":0.171667,"tR":0.317917,"efPrev":21,"ausP":2,"efReal":19},{"d":"17/Ago","est":6000,"real":4500,"desc":3,"tE":0.125,"tR":0.297083,"efPrev":21,"ausP":1,"efReal":20}]}]</script>
 <script>
 // ═══════════════════════════════════════════════════════════════════════
 // BASE DE DADOS — editável via aba "Editar Dados"
@@ -1454,12 +1535,21 @@ let LOTES = [
       {d:"07/Ago",est:6000,real:1788,desc:0, tE:0.049167,tR:0.282083,efPrev:21,ausP:1,efReal:20},
       {d:"10/Ago",est:6000,real:4785,desc:0, tE:0.049167,tR:0.310417,efPrev:21,ausP:1,efReal:19}
     ] },
-  { id:"261001B011", per:"19-24/Ago", mes:"Ago/26", q:"Q3", conc:"500 UI", dias:4, plan:21707, prod:21705, desc:2, tEstE4:14.47, tRealE4a:28.78, pnp:7.85, oee:{rot1:0.5128,rot2:0.5117,esteira:0.6012,bla:0.512,unit:0.5138}, desvAb:0, desvAtras:0,
+  { id:"261001B011", per:"19-24/Ago", mes:"Ago/26", q:"Q3", conc:"500 UI", dias:4, plan:21707, prod:21705, desc:2, tEstE4:14.47, tRealE4a:28.78, pnp:7.85, oee:{rot1:0.513,rot2:0.512,esteira:0.601,bla:0.512,unit:0.514}, desvAb:0, desvAtras:0,
     diarios:[
       {d:"19/ago",est:6000,real:5296,desc:0, tE:0.146667,tR:0.295,efPrev:21,ausP:0,efReal:21},
       {d:"20/ago",est:6000,real:5617,desc:0, tE:0.155417,tR:0.305417,efPrev:21,ausP:0,efReal:20},
       {d:"21/ago",est:6000,real:5592,desc:2, tE:0.154583,tR:0.314583,efPrev:21,ausP:0,efReal:19},
       {d:"24/ago",est:6000,real:5200,desc:0, tE:0.144167,tR:0.28125,efPrev:21,ausP:0,efReal:20}
+    ] },
+  { id:"261001C007", per:"26/Ago-02/Set", mes:"Ago/26", q:"Q3", conc:"500 UI", dias:6, plan:21939, prod:21937, desc:2, tEstE4:14.62, tRealE4a:36.77, pnp:9.7, oee:{rot1:0.475,rot2:0.471,esteira:0.476,bla:0.4,unit:0.422}, desvAb:1, desvAtras:0, obs:"Alto índice de descarte de Baxject - avaria no insumo (DEV-SEE-0021-26);\nAlto índice de descarte de cartucho e baixo OEE da esteira — utilização de cartuchos com código 128.",
+    diarios:[
+      {d:"26/08/2026",est:6000,real:5138,desc:0, tE:0.1425,tR:0.284583,efPrev:21,ausP:1,efReal:19},
+      {d:"27/08/2026",est:6000,real:5299,desc:0, tE:0.146667,tR:0.309583,efPrev:21,ausP:0,efReal:20},
+      {d:"28/08/2026",est:6000,real:4900,desc:0, tE:0.13625,tR:0.322083,efPrev:21,ausP:1,efReal:19},
+      {d:"31/08/2026",est:6000,real:4300,desc:0, tE:0.119583,tR:0.3125,efPrev:21,ausP:2,efReal:18},
+      {d:"01/09/2026",est:6000,real:2229,desc:0, tE:0.061667,tR:0.290833,efPrev:21,ausP:0,efReal:21},
+      {d:"02/09/2026",est:73,real:71,desc:2, tE:0.00125,tR:0.011667,efPrev:21,ausP:0,efReal:21}
     ] },
   { id:"261001D004", per:"12-17/Ago", mes:"Ago/26", q:"Q3", conc:"1500 UI", dias:4, plan:22018, prod:22015, desc:3, tEstE4:14.67, tRealE4a:29.17, pnp:6.75, oee:{rot1:0.514,rot2:0.494,esteira:0.618,bla:0.529,unit:0.514}, desvAb:1, desvAtras:0,
     diarios:[
@@ -1716,6 +1806,7 @@ function showSection(name, el) {
   if(name==='descarte') buildDescarte();
   if(name==='resumo') buildResumoExecutivo();
   if(name==='auditoria') carregarAuditoria();
+  if(name==='kit') { sortKitLotesCronologico(); buildKitCharts(); }
 }
 
 function updateNavBadge() {
@@ -2727,6 +2818,21 @@ function addDiaRow(tbodyId, d) {
   tbody.appendChild(tr);
 }
 
+// Versão simplificada do "+ Linha" de dados diários, exclusiva do Kit Médico:
+// só Dia / Planejado / Produzido (sem os campos de tempo/eficiência do produto principal).
+function addKitDiaRow(tbodyId, d) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  const tr = document.createElement('tr');
+  d = d || {};
+  tr.innerHTML = `
+    <td style="padding:3px 4px"><input type="text" class="kd-dia" value="${d.d||''}" placeholder="dd/mmm" style="background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text);padding:3px 5px;font-size:11px;width:90px"></td>
+    <td style="padding:3px 4px"><input type="number" class="kd-plan" value="${d.plan??''}" placeholder="0" style="background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text);padding:3px 5px;font-size:11px;width:80px;text-align:right"></td>
+    <td style="padding:3px 4px"><input type="number" class="kd-prod" value="${d.prod??''}" placeholder="0" style="background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text);padding:3px 5px;font-size:11px;width:80px;text-align:right"></td>
+    <td style="padding:3px 4px"><button onclick="this.closest('tr').remove()" style="background:rgba(240,64,96,0.15);border:1px solid rgba(240,64,96,0.3);color:var(--red);border-radius:4px;padding:2px 7px;cursor:pointer;font-size:11px">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+
 function toggleDiasRow(btn) {
   // data-target no botão "▼ Dias" já aponta para uid + '_dias'
   const targetId = btn.dataset.target;
@@ -2880,6 +2986,392 @@ function applyChanges() {
   rebuildDashboard();
   salvarLotesSupabase();
   registrarAuditoria(loteIdsAlterados);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SEÇÃO: KIT MÉDICO — produto independente, com sua própria planilha,
+// seus próprios gráficos e sua própria tabela no Supabase. Não compartilha
+// nenhum dado com LOTES (linha Hemo-8r) — mantido deliberadamente separado.
+// ═══════════════════════════════════════════════════════════════════
+let KIT_LOTES = [];
+
+// Insumos consumidos na fabricação do próprio Kit Médico (bill of materials do Kit,
+// diferente do "Kit Médico" que aparece como insumo consumido pela linha Hemo-8r).
+// prop:1 assume que cada kit consome 1 unidade de cada item — ajuste aqui se algum
+// insumo tiver proporção diferente (ex.: 1 a cada N kits).
+const KIT_INSUMOS_META = [
+  { key:'cartucho', label:'Cartucho', prop:1 },
+  { key:'bula', label:'Bula', prop:1 },
+  { key:'swab', label:'Swab', prop:1 },
+  { key:'curativo', label:'Curativo', prop:1 },
+  { key:'escalpe', label:'Escalpe', prop:1 },
+  { key:'seringa', label:'Seringa', prop:1 },
+];
+
+function sortKitLotesCronologico() {
+  KIT_LOTES.sort((a, b) => {
+    const ra = perToDateRange(a.per), rb = perToDateRange(b.per);
+    if (ra && rb) return ra.inicio - rb.inicio;
+    if (ra) return -1;
+    if (rb) return 1;
+    return 0;
+  });
+}
+
+function kitSheetRow(l, idx) {
+  const tr = document.createElement('tr');
+  tr.dataset.idx = idx;
+  const escHtml = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const ins = l.insumos || {};
+  const uid = 'kit_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+  const COLS = 12;
+
+  tr.innerHTML = `
+    <td><input class="cell f-id" value="${l.id||''}" placeholder="ID do lote" style="min-width:110px"></td>
+    <td style="background:rgba(245,166,35,0.04)"><textarea class="cell f-obs" rows="1" placeholder="Observações sobre este lote" style="min-width:220px;width:100%;resize:vertical;font-family:inherit;background:var(--bg3);border:none;color:var(--text);padding:8px;font-size:12px">${escHtml(l.obs)}</textarea></td>
+    <td><input class="cell f-per" value="${l.per||''}" placeholder="dd/mm–dd/mm"></td>
+    <td><input class="cell f-mes" value="${l.mes||''}" list="mesList" placeholder="Mês/26"></td>
+    <td><select class="cell f-q">${Q_ORDER.map(q=>`<option value="${q}" ${q===l.q?'selected':''}>${q}</option>`).join('')}</select></td>
+    <td><input type="number" class="cell num f-dias" value="${l.dias ?? 0}"></td>
+    <td><input type="number" class="cell num f-plan" value="${l.plan ?? ''}" placeholder="—"></td>
+    <td><input type="number" class="cell num f-prod" value="${l.prod ?? ''}" placeholder="—"></td>
+    <td><input type="number" step="0.01" class="cell num f-pnp" value="${l.pnp ?? ''}" placeholder="—"></td>
+    <td><input type="number" class="cell num f-desvab" value="${l.desvAb ?? 0}"></td>
+    <td style="text-align:center;white-space:nowrap">
+      <button class="ins-toggle" data-target="${uid}" onclick="toggleInsRow(this)" title="Expandir/recolher campos de insumos">▼ Insumos</button>
+      <button class="ins-toggle" data-target="${uid}_dias" onclick="toggleDiasRow(this)" title="Expandir/recolher dados diários" style="margin-top:4px;background:rgba(34,212,150,0.15);border-color:rgba(34,212,150,0.3);color:var(--green2)">▼ Dias</button>
+    </td>
+    <td><button class="row-del" title="Remover lote" onclick="removerLinhaKit(this)">✕</button></td>
+  `;
+
+  // Sub-linha de insumos — mostra os campos assim que KIT_INSUMOS_META for preenchido
+  const trIns = document.createElement('tr');
+  trIns.className = 'ins-row';
+  trIns.id = uid;
+  trIns.dataset.idx = idx;
+  const insFieldsHtml = KIT_INSUMOS_META.length
+    ? KIT_INSUMOS_META.map(m => `
+        <div class="ins-field">
+          <span class="ins-label">${m.label}</span>
+          <input type="number" class="cell num f-ins-${m.key}" value="${ins[m.key] ?? ''}" placeholder="—" style="min-width:0">
+        </div>`).join('')
+    : `<div style="font-size:12px;color:var(--text3);padding:8px 0">Nenhum insumo configurado ainda para o Kit Médico.</div>`;
+  trIns.innerHTML = `
+    <td colspan="${COLS}">
+      <div class="ins-inner">
+        ${insFieldsHtml}
+        ${KIT_INSUMOS_META.length ? `<div style="align-self:flex-end;margin-left:4px;font-size:10px;color:var(--text3)">Descarte por insumo (un.)</div>` : ''}
+      </div>
+    </td>`;
+
+  // Sub-linha de dados diários — versão simplificada específica do Kit Médico
+  // (apenas Dia / Planejado / Produzido, sem os campos de tempo/eficiência do produto principal)
+  const trDias = document.createElement('tr');
+  trDias.className = 'dias-row';
+  trDias.id = uid + '_dias';
+  trDias.dataset.idx = idx;
+  const diasExistentes = (l.diarios || []);
+  trDias.innerHTML = `
+    <td colspan="${COLS}">
+      <div class="dias-inner" style="padding:12px 16px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:600;color:var(--text2)">Quantidade por dia</span>
+          <span style="font-size:10px;color:var(--text3)">Planejado e Produzido em unidades</span>
+          <button onclick="addKitDiaRow('${uid}_dias_tbody')" style="margin-left:auto;background:rgba(34,212,150,0.15);border:1px solid rgba(34,212,150,0.3);color:var(--green2);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer">+ Linha</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead><tr style="color:var(--text3)">
+              <th style="padding:4px 6px;text-align:left;white-space:nowrap">Dia</th>
+              <th style="padding:4px 6px;text-align:right">Planejado</th>
+              <th style="padding:4px 6px;text-align:right">Produzido</th>
+              <th style="padding:4px 6px"></th>
+            </tr></thead>
+            <tbody id="${uid}_dias_tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </td>`;
+  diasExistentes.forEach(d => addKitDiaRow(uid + '_dias_tbody', d));
+
+  const perInput = tr.querySelector('.f-per');
+  perInput.addEventListener('change', () => autoPreencherLinha(tr));
+  perInput.addEventListener('blur', () => autoPreencherLinha(tr));
+
+  return [tr, trIns, trDias];
+}
+
+function renderKitSheet() {
+  const tbody = document.getElementById('kitSheetBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  KIT_LOTES.forEach((l, idx) => {
+    const [tr, trIns, trDias] = kitSheetRow(l, idx);
+    tbody.appendChild(tr);
+    tbody.appendChild(trIns);
+    tbody.appendChild(trDias);
+  });
+}
+
+function addKitSheetRow() {
+  const novo = { id:'', per:'', mes: MES_ORDER[0], q:'Q1', dias:1, plan:null, prod:null, pnp:null, desvAb:0, insumos:{}, obs:'' };
+  const tbody = document.getElementById('kitSheetBody');
+  const [tr, trIns, trDias] = kitSheetRow(novo, 'new');
+  tbody.appendChild(tr);
+  tbody.appendChild(trIns);
+  tbody.appendChild(trDias);
+  tr.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function removerLinhaKit(btn) {
+  const trPrincipal = btn.closest('tr');
+  if (!trPrincipal) return;
+  let next = trPrincipal.nextElementSibling;
+  while (next && (next.classList.contains('ins-row') || next.classList.contains('dias-row'))) {
+    const toRemove = next;
+    next = next.nextElementSibling;
+    toRemove.remove();
+  }
+  trPrincipal.remove();
+}
+
+function applyKitChanges() {
+  const rows = [...document.querySelectorAll('#kitSheetBody tr:not(.ins-row):not(.dias-row)')];
+  const novosLotes = [];
+
+  rows.forEach(tr => {
+    const v = cls => { const el = tr.querySelector('.'+cls); return el ? el.value : ''; };
+
+    const id = v('f-id').trim();
+    const per = v('f-per').trim();
+    const mes = v('f-mes').trim();
+    const q = v('f-q');
+    const dias = +v('f-dias') || 0;
+    const planRaw = v('f-plan');
+    const plan = planRaw === '' ? null : +planRaw;
+    const prodRaw = v('f-prod');
+    const prod = prodRaw === '' ? null : +prodRaw;
+    const pnpRaw = v('f-pnp');
+    const pnp = pnpRaw === '' ? null : +pnpRaw;
+    const desvAb = +v('f-desvab') || 0;
+    const obs = (v('f-obs') || '').trim();
+
+    // Ignora linhas totalmente vazias (sem ID nem período)
+    if (!id && !per) return;
+
+    const trIns = tr.nextElementSibling?.classList.contains('ins-row') ? tr.nextElementSibling : null;
+    const vi = cls => { const el = trIns ? trIns.querySelector('.'+cls) : null; return el ? el.value : ''; };
+    const insumos = {};
+    KIT_INSUMOS_META.forEach(m => {
+      const raw = vi('f-ins-' + m.key);
+      insumos[m.key] = raw === '' ? null : +raw;
+    });
+    const hasInsumos = Object.values(insumos).some(x => x !== null);
+
+    const uid = tr.querySelector('.ins-toggle')?.dataset?.target;
+    const diasTbody = uid ? document.getElementById(uid + '_dias_tbody') : null;
+    let diarios = [];
+    if (diasTbody) {
+      diasTbody.querySelectorAll('tr').forEach(lr => {
+        const d = lr.querySelector('.kd-dia')?.value.trim() || '';
+        const planDiaRaw = lr.querySelector('.kd-plan')?.value;
+        const prodDiaRaw = lr.querySelector('.kd-prod')?.value;
+        const planDia = planDiaRaw === '' || planDiaRaw === undefined ? null : +planDiaRaw;
+        const prodDia = prodDiaRaw === '' || prodDiaRaw === undefined ? null : +prodDiaRaw;
+        if (d || planDia !== null || prodDia !== null) diarios.push({ d, plan: planDia, prod: prodDia });
+      });
+    }
+    if (!diarios.length) {
+      const existente = KIT_LOTES.find(l => l.id === id);
+      if (existente?.diarios?.length) diarios = existente.diarios;
+    }
+
+    novosLotes.push({ id, per, mes, q, dias, plan, prod, pnp, desvAb, diarios, insumos: hasInsumos ? insumos : null, obs: obs || undefined });
+  });
+
+  KIT_LOTES = novosLotes;
+  sortKitLotesCronologico();
+
+  buildKitCharts();
+  salvarKitLotesSupabase();
+}
+
+function setKitSyncStatus(msg, cor) {
+  const el = document.getElementById('kitSheetSyncStatus');
+  if (el) { el.textContent = msg; if (cor) el.style.color = cor; }
+}
+
+async function carregarKitLotesSupabase() {
+  if (!sb) return;
+  try {
+    const { data, error } = await sb.from('kit_medico_lotes').select('*').order('updated_at', { ascending: true });
+    if (!error && data) {
+      KIT_LOTES = data.map(r => r.dados).filter(Boolean);
+    }
+  } catch (e) {
+    console.error('Erro ao carregar Kit Médico:', e);
+  }
+  sortKitLotesCronologico();
+  renderKitSheet();
+}
+
+async function salvarKitLotesSupabase() {
+  setKitSyncStatus('⟳ salvando…');
+  if (!sb) { setKitSyncStatus('dados locais (sem conexão)', 'var(--text3)'); return; }
+  const { data: sessao } = await sb.auth.getSession();
+  if (!sessao?.session) return;
+
+  const rows = KIT_LOTES.map(l => ({
+    id: l.id || ('kit_novo_' + Date.now() + '_' + Math.random().toString(36).slice(2,6)),
+    dados: l,
+    updated_at: new Date().toISOString()
+  }));
+
+  if (!rows.length) { setKitSyncStatus(''); return; }
+
+  const { error } = await sb.from('kit_medico_lotes').upsert(rows, { onConflict: 'id' });
+  if (error) {
+    setKitSyncStatus('⚠ erro ao salvar', '#ef4444');
+    console.error('Erro ao salvar Kit Médico:', error);
+  } else {
+    setKitSyncStatus('✓ salvo · ' + new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }), 'var(--green2)');
+  }
+}
+
+// Exporta a tabela de lotes do Kit Médico em CSV
+function exportarKitLotesCSV() {
+  if (!KIT_LOTES.length) return;
+  const cab = ['Lote', 'Período', 'Mês', 'Trimestre', 'Dias', 'Planejado', 'Produzido', 'PNP (h)', 'Desv. Abertos'];
+  const linhas = [cab, ...KIT_LOTES.map(l => [
+    l.id || '', l.per || '', l.mes || '', l.q || '', l.dias ?? '',
+    l.plan ?? '', l.prod ?? '',
+    l.pnp !== null && l.pnp !== undefined ? l.pnp : '', l.desvAb ?? ''
+  ])];
+  const csv = linhas.map(l => l.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'kit_medico_lotes.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  if (typeof showToast === 'function') showToast('💾 CSV exportado');
+}
+
+// Monta os gráficos exclusivos do Kit Médico — deliberadamente à parte dos gráficos
+// do produto principal (LOTES): nenhuma função ou dataset é compartilhado entre eles.
+function buildKitCharts() {
+  const ids = KIT_LOTES.map(l => l.id || '—');
+
+  setChart('kit_vol', 'chartKitVol', {
+    type: 'bar',
+    data: { labels: ids, datasets: [
+      { label: 'Planejado', data: KIT_LOTES.map(l => l.plan ?? null), backgroundColor: 'rgba(79,142,247,0.3)', borderColor: clr.line1, borderWidth: 1.5 },
+      { label: 'Produzido', data: KIT_LOTES.map(l => l.prod ?? null), backgroundColor: 'rgba(34,212,150,0.3)', borderColor: clr.green, borderWidth: 1.5 }
+    ]},
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:14,padding:8,font:{size:10}}}}, scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid},ticks:{callback:v=>fNum(v)}}} }
+  });
+
+  setChart('kit_pnp', 'chartKitPNP', {
+    type: 'bar',
+    data: { labels: ids, datasets: [{
+      label: 'PNP (h)',
+      data: KIT_LOTES.map(l => l.pnp !== null && l.pnp !== undefined ? +l.pnp.toFixed(2) : null),
+      backgroundColor: KIT_LOTES.map(l => (l.pnp||0) > 6 ? 'rgba(240,64,96,0.5)' : (l.pnp||0) > 4 ? 'rgba(245,166,35,0.5)' : 'rgba(79,142,247,0.35)'),
+      borderColor: KIT_LOTES.map(l => (l.pnp||0) > 6 ? clr.red : (l.pnp||0) > 4 ? clr.amber : clr.line1),
+      borderWidth: 1.5
+    }]},
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid}}} }
+  });
+
+  setChart('kit_desvab', 'chartKitDesvAb', {
+    type: 'bar',
+    data: { labels: ids, datasets: [{
+      label: 'Desvios Abertos',
+      data: KIT_LOTES.map(l => l.desvAb ?? 0),
+      backgroundColor: 'rgba(155,107,255,0.35)',
+      borderColor: clr.purple,
+      borderWidth: 1.5
+    }]},
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid}}} }
+  });
+
+  // Gráficos de descarte por insumo — mesmo padrão visual da aba "Descarte de Insumos"
+  // do produto principal (barra + tendência em média móvel + média), porém com dados
+  // e função totalmente separados (KIT_LOTES / KIT_INSUMOS_META).
+  const container = document.getElementById('kitDescarteCharts');
+  if (container) {
+    container.innerHTML = '';
+    KIT_INSUMOS_META.forEach(ins => {
+      const pcts = KIT_LOTES.map(l => {
+        const qtd = l.insumos ? (l.insumos[ins.key] ?? null) : null;
+        if (!l.plan || qtd === null) return null;
+        const planejadoInsumo = l.plan * ins.prop;
+        return planejadoInsumo > 0 ? (qtd / planejadoInsumo * 100) : null;
+      });
+      const cores  = pcts.map(p => p===null?'rgba(100,100,120,0.3)': p>5?'rgba(239,68,68,0.5)':  p>1?'rgba(245,166,35,0.5)':  p>0?'rgba(79,142,247,0.5)':  'rgba(34,212,150,0.35)');
+      const bordas = pcts.map(p => p===null?'#555':                  p>5?'#ef4444':               p>1?'#f5a623':               p>0?'#4f8ef7':               '#22d496');
+      const tendencia = calcularTendencia(pcts);
+      const media = calcularMedia(pcts);
+
+      const wrap = document.createElement('div');
+      wrap.className = 'chart-panel';
+      const canvasId = 'chartKitDesc_' + ins.key;
+      wrap.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div class="chart-title">${ins.label}</div>
+          <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('kit_desc_${ins.key}','kit_medico_descarte_${ins.key}')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+        </div>
+        <div class="chart-insight">% descartado em relação ao planejado · verde=0% · azul=&gt;0% · laranja=&gt;1% · vermelho=&gt;5%</div>
+        <div class="chart-wrap" style="height:220px"><canvas id="${canvasId}"></canvas></div>`;
+      container.appendChild(wrap);
+
+      setChart('kit_desc_' + ins.key, canvasId, {
+        type: 'bar',
+        data: { labels: ids, datasets: [
+          { type:'bar', label:'% Descarte', data: pcts.map(p=>p!==null?+p.toFixed(4):null), backgroundColor: cores, borderColor: bordas, borderWidth: 1.5, order: 3 },
+          { type:'line', label:'Tendência', data: tendencia, borderColor: clr.purple, backgroundColor:'transparent', borderWidth:2.25, pointRadius:0, tension:0.35, fill:false, order:1, trendSummary:{unit:'%',decimals:2} },
+          { type:'line', label:'Média', data: media, borderColor: clr.line3, backgroundColor:'transparent', borderWidth:1.5, borderDash:[2,2], pointRadius:0, tension:0, fill:false, order:2 }
+        ]},
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          plugins: {
+            legend: { display:true, position:'bottom', labels:{ filter:item=>item.text!=='% Descarte', boxWidth:14, padding:8, font:{size:10} } },
+            tooltip: { callbacks: { label: ctx => {
+              if (ctx.dataset.label !== '% Descarte') return ctx.dataset.label + ': ' + (ctx.parsed.y!==null?ctx.parsed.y.toFixed(4)+'%':'—');
+              const l = KIT_LOTES[ctx.dataIndex];
+              const un = l && l.insumos ? (l.insumos[ins.key] ?? '—') : '—';
+              return ctx.parsed.y!==null ? `${ctx.parsed.y.toFixed(4)}%  (${un} un. descartadas)` : 'Sem dados';
+            }}}
+          },
+          scales: { x:{grid:{color:clr.grid}}, y:{grid:{color:clr.grid},ticks:{callback:v=>v.toFixed(2)+'%'},beginAtZero:true} }
+        }
+      });
+    });
+  }
+
+  // Tabela de lotes
+  const tbody = document.getElementById('kitLotesTableBody');
+  if (tbody) {
+    if (!KIT_LOTES.length) {
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:24px">Nenhum lote de Kit Médico cadastrado ainda. Adicione um na aba "Editar Dados".</td></tr>';
+    } else {
+      tbody.innerHTML = KIT_LOTES.map(l => `
+        <tr>
+          <td><strong>${l.id || '—'}</strong></td>
+          <td style="color:var(--text2)">${l.per || '—'}</td>
+          <td style="color:var(--text2)">${l.mes || '—'}</td>
+          <td style="color:var(--text2)">${l.q || '—'}</td>
+          <td style="text-align:center">${l.dias ?? '—'}</td>
+          <td style="text-align:right">${l.plan != null ? fNum(l.plan) : '<span style="color:var(--text3)">N/D</span>'}</td>
+          <td style="text-align:right">${l.prod != null ? fNum(l.prod) : '<span style="color:var(--text3)">N/D</span>'}</td>
+          <td style="text-align:center">${l.pnp !== null && l.pnp !== undefined ? fH(l.pnp) : '<span style="color:var(--text3)">N/D</span>'}</td>
+          <td style="text-align:center">${l.desvAb ?? 0}</td>
+        </tr>`).join('');
+    }
+  }
 }
 
 function baixarHTMLAtualizado() {
@@ -3593,6 +4085,7 @@ function initDashboard() {
   inicializarDescFiltros();
   inicializarCompFiltros();
   atualizarBadgePendentes();
+  carregarKitLotesSupabase(); // carrega e renderiza os dados do Kit Médico (independente de LOTES)
 
   // Aba "Auditoria" só aparece para o e-mail administrador
   const navAud = document.getElementById('navAuditoria');
