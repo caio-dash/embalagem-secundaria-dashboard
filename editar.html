@@ -530,6 +530,15 @@ select.cell option { background: var(--bg3); color: var(--text); }
   </div>
 
   <div class="chart-panel" style="margin-bottom:20px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <div class="chart-title" id="compDesvAbTitle">Desvios abertos por lote</div>
+      <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('compDesvAb','comparativo_desvios_abertos')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+    </div>
+    <div class="chart-insight">Quantidade de desvios de qualidade abertos por lote</div>
+    <div class="chart-wrap" style="height:260px"><canvas id="chartCompDesvAb" role="img" aria-label="Desvios abertos por lote" style="box-sizing: border-box; display: block; height: 260px; width: 626px;" width="626" height="260"></canvas></div>
+  </div>
+
+  <div class="chart-panel" style="margin-bottom:20px">
     <div class="chart-title">Tabela comparativa completa</div>
     <div class="chart-insight">Todos os lotes com seus principais indicadores</div>
     <div style="overflow-x:auto">
@@ -2102,7 +2111,7 @@ function agregarLotesComparativo(lotesFiltrados) {
     if (!grupos[g.key]) {
       grupos[g.key] = {
         label: g.label, order: g.order, nLotes: 0,
-        plan: 0, prod: 0, desc: 0,
+        plan: 0, prod: 0, desc: 0, desvAb: 0,
         tEstE4Soma: 0, tRealE4aSoma: 0,
         pnpSoma: 0, pnpN: 0,
         oeeSoma: 0, oeeN: 0
@@ -2113,6 +2122,7 @@ function agregarLotesComparativo(lotesFiltrados) {
     grp.plan += l.plan;
     grp.prod += l.prod;
     grp.desc += l.desc;
+    grp.desvAb += (l.desvAb || 0);
     grp.tEstE4Soma += l.tEstE4;
     grp.tRealE4aSoma += l.tRealE4a;
     if (l.pnp !== null && l.pnp !== undefined) { grp.pnpSoma += l.pnp; grp.pnpN++; }
@@ -2121,7 +2131,7 @@ function agregarLotesComparativo(lotesFiltrados) {
   return Object.values(grupos).sort((a, b) => a.order - b.order).map(g => ({
     label: g.label,
     nLotes: g.nLotes,
-    plan: g.plan, prod: g.prod, desc: g.desc,
+    plan: g.plan, prod: g.prod, desc: g.desc, desvAb: g.desvAb,
     descPct: g.plan ? (g.desc / g.plan * 100) : 0,
     tEstE4: g.nLotes ? g.tEstE4Soma / g.nLotes : 0,
     tRealE4a: g.nLotes ? g.tRealE4aSoma / g.nLotes : 0,
@@ -2175,7 +2185,7 @@ function buildComparativo() {
     });
     const tbody = document.getElementById('compTable');
     if (tbody) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text3);padding:24px">Nenhum lote encontrado para os filtros selecionados.</td></tr>';
-    ['compVol','compDesc','compTempo','compPNP','progressoAnual'].forEach(key => {
+    ['compVol','compDesc','compTempo','compPNP','compDesvAb','progressoAnual'].forEach(key => {
       if (CHARTS[key]) { CHARTS[key].destroy(); delete CHARTS[key]; }
     });
     const badgesEl = document.getElementById('progressoBadges'); if (badgesEl) badgesEl.innerHTML = '';
@@ -2193,7 +2203,7 @@ function buildComparativo() {
       perTxt: l.per || '—',
       diasTxt: String(l.dias),
       nLotes: 1,
-      plan: l.plan, prod: l.prod, desc: l.desc,
+      plan: l.plan, prod: l.prod, desc: l.desc, desvAb: l.desvAb || 0,
       descPct: l.plan ? l.desc/l.plan*100 : 0,
       tEstE4: l.tEstE4, tRealE4a: l.tRealE4a,
       pnp: (l.pnp !== null && l.pnp !== undefined) ? l.pnp : null,
@@ -2207,7 +2217,7 @@ function buildComparativo() {
       perTxt: `${g.nLotes} lote${g.nLotes!==1?'s':''}`,
       diasTxt: String(g.nLotes),
       nLotes: g.nLotes,
-      plan: g.plan, prod: g.prod, desc: g.desc, descPct: g.descPct,
+      plan: g.plan, prod: g.prod, desc: g.desc, desvAb: g.desvAb, descPct: g.descPct,
       tEstE4: g.tEstE4, tRealE4a: g.tRealE4a, pnp: g.pnp, oeeRot1: g.oeeRot1,
       obs: '' // observações não fazem sentido agregadas por período
     }));
@@ -2221,10 +2231,12 @@ function buildComparativo() {
   const tituloDesc = compGranularidade === 'lote' ? 'Descarte por lote (unidades)' : `Descarte por ${granLabel} (unidades)`;
   const tituloTempo = compGranularidade === 'lote' ? 'Tempo real Etapa 4 Ajustada por lote (h)' : `Tempo real Etapa 4 Ajustada — média por ${granLabel} (h)`;
   const tituloPNP = compGranularidade === 'lote' ? 'Paradas não planejadas registradas (h)' : `Paradas não planejadas — média por ${granLabel} (h)`;
+  const tituloDesvAb = compGranularidade === 'lote' ? 'Desvios abertos por lote' : `Desvios abertos — soma por ${granLabel}`;
   const elVolTitle = document.getElementById('compVolTitle'); if (elVolTitle) elVolTitle.textContent = tituloVol;
   const elDescTitle = document.getElementById('compDescTitle'); if (elDescTitle) elDescTitle.textContent = tituloDesc;
   const elTempoTitle = document.getElementById('compTempoTitle'); if (elTempoTitle) elTempoTitle.textContent = tituloTempo;
   const elPNPTitle = document.getElementById('compPNPTitle'); if (elPNPTitle) elPNPTitle.textContent = tituloPNP;
+  const elDesvAbTitle = document.getElementById('compDesvAbTitle'); if (elDesvAbTitle) elDesvAbTitle.textContent = tituloDesvAb;
   const elColDias = document.getElementById('compColDias'); if (elColDias) elColDias.textContent = colDiasLabel;
 
   const ids = itens.map(x => x.label);
@@ -2415,6 +2427,16 @@ function buildComparativo() {
         {type:'line',label:'Tendência',data:calcularTendencia(pnpItens.map(x=>+x.pnp.toFixed(1))),borderColor:clr.purple,backgroundColor:'transparent',borderWidth:2.25,pointRadius:0,tension:0.35,fill:false,order:1,trendSummary:{unit:'h',decimals:1}}
       ]
     },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:12,padding:8,font:{size:10}}}},scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid}}}}
+  });
+
+  setChart('compDesvAb','chartCompDesvAb', {
+    type:'bar', data:{
+      labels:ids,
+      datasets:[
+        {label:'Desvios Abertos',data:itens.map(x=>x.desvAb),backgroundColor:itens.map(x=>x.desvAb>1?'rgba(240,64,96,0.5)':x.desvAb>0?'rgba(245,166,35,0.5)':'rgba(34,212,150,0.3)'),borderColor:itens.map(x=>x.desvAb>1?clr.red:x.desvAb>0?clr.amber:clr.green),borderWidth:1.5,order:2},
+        {type:'line',label:'Tendência',data:calcularTendencia(itens.map(x=>x.desvAb)),borderColor:clr.purple,backgroundColor:'transparent',borderWidth:2.25,pointRadius:0,tension:0.35,fill:false,order:1,trendSummary:{unit:'',decimals:1}}
+      ]
+    },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:12,padding:8,font:{size:10}}}},scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid},ticks:{stepSize:1}}}}
   });
 
   // Tabela
