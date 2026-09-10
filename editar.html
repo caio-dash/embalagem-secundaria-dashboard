@@ -199,6 +199,22 @@ select.cell option { background: var(--bg3); color: var(--text); }
   #sec-resumo { position: absolute; left: 0; top: 0; width: 100%; }
   .no-print { display: none !important; }
 }
+
+/* Modal de zoom: clique em qualquer gráfico para ampliar */
+.chart-zoom-modal {
+  display: none; position: fixed; inset: 0; z-index: 10000;
+  background: rgba(0,0,0,0.75);
+  align-items: center; justify-content: center;
+  padding: 24px;
+}
+.chart-zoom-content {
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  width: 100%; max-width: 1100px; max-height: 90vh;
+  display: flex; flex-direction: column; padding: 20px 24px;
+}
+.chart-zoom-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; }
+.chart-zoom-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.chart-zoom-body { flex: 1; min-height: 420px; position: relative; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -1382,6 +1398,17 @@ select.cell option { background: var(--bg3); color: var(--text); }
 
 </main>
 
+<!-- Modal de zoom: aberto ao clicar em qualquer gráfico -->
+<div id="chartZoomModal" class="chart-zoom-modal" onclick="if(event.target===this) fecharZoomChart()">
+  <div class="chart-zoom-content">
+    <div class="chart-zoom-header">
+      <div id="chartZoomTitle" class="chart-zoom-title"></div>
+      <button type="button" class="lote-btn" onclick="fecharZoomChart()">✕ Fechar</button>
+    </div>
+    <div class="chart-zoom-body"><canvas id="chartZoomCanvas"></canvas></div>
+  </div>
+</div>
+
 <div class="toast" id="toast">✓ Dashboard atualizado com sucesso!</div>
 </div><!-- /dashboardMain -->
 
@@ -1692,12 +1719,46 @@ function oeeClass(v) { if(v===undefined||v===null) return ''; if(v>=0.85) return
 
 // Registro global de instâncias Chart.js (permite reconstrução segura)
 let CHARTS = {};
+let CHART_CONFIGS = {}; // guarda o config original de cada gráfico, usado para reconstruir a versão ampliada
 function setChart(key, canvasId, config) {
   if(CHARTS[key]) { CHARTS[key].destroy(); delete CHARTS[key]; }
   const el = document.getElementById(canvasId);
   if(!el) return;
   CHARTS[key] = new Chart(el, config);
+  CHART_CONFIGS[key] = config;
+  el.style.cursor = 'zoom-in';
+  el.title = 'Clique para ampliar';
+  el.onclick = () => abrirZoomChart(key, el);
 }
+
+// Zoom: reabre o mesmo gráfico (mesmo tipo/dados/opções) numa versão ampliada em modal
+let zoomChartInstance = null;
+function abrirZoomChart(key, origEl) {
+  const config = CHART_CONFIGS[key];
+  const modal = document.getElementById('chartZoomModal');
+  const canvas = document.getElementById('chartZoomCanvas');
+  const tituloEl = document.getElementById('chartZoomTitle');
+  if (!config || !modal || !canvas) return;
+  if (zoomChartInstance) { zoomChartInstance.destroy(); zoomChartInstance = null; }
+  if (tituloEl) {
+    const painelTitulo = origEl && origEl.closest ? origEl.closest('.chart-panel')?.querySelector('.chart-title')?.textContent : '';
+    tituloEl.textContent = painelTitulo || '';
+  }
+  modal.style.display = 'flex';
+  zoomChartInstance = new Chart(canvas, {
+    type: config.type,
+    data: config.data,
+    options: { ...(config.options || {}), maintainAspectRatio: false, responsive: true }
+  });
+}
+
+function fecharZoomChart() {
+  const modal = document.getElementById('chartZoomModal');
+  if (modal) modal.style.display = 'none';
+  if (zoomChartInstance) { zoomChartInstance.destroy(); zoomChartInstance = null; }
+}
+
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharZoomChart(); });
 
 // Exportação genérica de CSV para qualquer gráfico registrado em CHARTS — lê direto os
 // labels/datasets já renderizados no Chart.js, então o CSV sempre bate com o que está na tela.
