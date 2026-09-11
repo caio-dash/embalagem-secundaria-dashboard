@@ -276,6 +276,7 @@ select.cell option { background: var(--bg3); color: var(--text); }
     <div class="nav-tab" onclick="showSection(&#39;periodo&#39;, this)">Visão por Período</div>
     <div class="nav-tab" onclick="showSection(&#39;oee&#39;, this)">OEE por Equipamento</div>
     <div class="nav-tab" onclick="showSection(&#39;descarte&#39;, this)">Descarte de Insumos<span id="descPendenteBadge" style="display:none;margin-left:6px;background:#f5a623;color:#1a1a2e;font-size:10px;font-weight:700;border-radius:10px;padding:1px 7px"></span></div>
+    <div class="nav-tab" onclick="showSection(&#39;kit&#39;, this)">Kit Médico</div>
     
   </div>
   <div class="nav-badge" id="navBadge">Jan/26–Jun/26 · 16 lotes · 349.742 un.</div>
@@ -840,6 +841,60 @@ select.cell option { background: var(--bg3); color: var(--text); }
 </div>
 
 <!-- ════════════════════════════════════════════════ SEÇÃO: DESCARTE INSUMOS -->
+<div id="sec-kit" class="section">
+  <div class="page-header">
+    <div class="page-title">Kit Médico</div>
+    <div class="page-sub">Indicadores exclusivos do produto Kit Médico — controlados separadamente dos demais produtos</div>
+  </div>
+
+  <div class="chart-panel" style="margin-bottom:20px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <div class="chart-title">Volume Planejado × Produzido por lote</div>
+      <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('kit_vol','kit_medico_volume')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+    </div>
+    <div class="chart-insight">Quantidade planejada vs. produzida de Kit Médico por lote</div>
+    <div class="chart-wrap" style="height:300px"><canvas id="chartKitVol"></canvas></div>
+  </div>
+
+  <div class="chart-row cols2">
+    <div class="chart-panel">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title">PNP por lote</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('kit_pnp','kit_medico_pnp')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
+      <div class="chart-insight">Paradas não planejadas registradas por lote (h)</div>
+      <div class="chart-wrap" style="height:300px"><canvas id="chartKitPNP"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="chart-title">Desvios abertos por lote</div>
+        <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('kit_desvab','kit_medico_desvios')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+      </div>
+      <div class="chart-insight">Quantidade de desvios abertos por lote</div>
+      <div class="chart-wrap" style="height:300px"><canvas id="chartKitDesvAb"></canvas></div>
+    </div>
+  </div>
+
+  <div class="page-header" style="margin-top:28px;margin-bottom:12px">
+    <div class="page-title" style="font-size:16px">Descarte por insumo — Kit Médico</div>
+    <div class="page-sub">Cartucho, Bula, Swab, Curativo, Escalpe e Seringa</div>
+  </div>
+  <div id="kitDescarteCharts" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:20px"></div>
+
+  <div class="chart-panel" style="margin-top:20px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <div class="chart-title">Lotes — Kit Médico</div>
+      <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarKitLotesCSV()" title="Exportar esta tabela em CSV">⭳ CSV</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table" id="kitLotesTable">
+        <thead><tr><th>Lote</th><th>Período</th><th>Mês</th><th>Trim.</th><th>Dias</th><th>Planejado</th><th>Produzido</th><th>PNP</th><th>Desv. Abertos</th></tr></thead>
+        <tbody id="kitLotesTableBody"><tr><td colspan="9" style="text-align:center;color:var(--text3);padding:24px">Nenhum lote de Kit Médico cadastrado ainda.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div id="sec-descarte" class="section">
   <div class="page-header">
     <div class="page-title">Descarte de Insumos</div>
@@ -1361,6 +1416,7 @@ function showSection(name, el) {
   if(name==='periodo') buildVisaoPeriodo();
   if(name==='oee') buildOEE();
   if(name==='descarte') buildDescarte();
+  if(name==='kit') { sortKitLotesCronologico(); buildKitCharts(); }
 }
 
 function updateNavBadge() {
@@ -3073,6 +3129,183 @@ function sortLotesCronologico() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// SEÇÃO: KIT MÉDICO — produto separado, dados e gráficos isolados de LOTES.
+// Somente leitura nesta versão view-only (edição acontece no dashboard com login).
+// ═══════════════════════════════════════════════════════════════════
+let KIT_LOTES = [];
+
+const KIT_INSUMOS_META = [
+  { key:'cartucho', label:'Cartucho', prop:1 },
+  { key:'bula', label:'Bula', prop:1 },
+  { key:'swab', label:'Swab', prop:1 },
+  { key:'curativo', label:'Curativo', prop:1 },
+  { key:'escalpe', label:'Escalpe', prop:1 },
+  { key:'seringa', label:'Seringa', prop:1 },
+];
+
+function sortKitLotesCronologico() {
+  KIT_LOTES.sort((a, b) => {
+    const ra = perToDateRange(a.per), rb = perToDateRange(b.per);
+    if (ra && rb) return ra.inicio - rb.inicio;
+    if (ra) return -1;
+    if (rb) return 1;
+    return 0;
+  });
+}
+
+async function carregarKitLotesSupabase() {
+  if (!sb) return;
+  try {
+    const { data, error } = await sb.from('kit_medico_lotes').select('*').order('updated_at', { ascending: true });
+    if (!error && data) {
+      KIT_LOTES = data.map(r => r.dados).filter(Boolean);
+    }
+  } catch (e) {
+    console.error('Erro ao carregar Kit Médico:', e);
+  }
+  sortKitLotesCronologico();
+  // Se o usuário já estiver na aba "Kit Médico" quando os dados chegarem
+  // (carregamento em paralelo ao do produto principal), atualiza os gráficos agora.
+  if (document.getElementById('sec-kit')?.classList.contains('active')) buildKitCharts();
+}
+
+// Exporta a tabela de lotes do Kit Médico em CSV
+function exportarKitLotesCSV() {
+  if (!KIT_LOTES.length) return;
+  const cab = ['Lote', 'Período', 'Mês', 'Trimestre', 'Dias', 'Planejado', 'Produzido', 'PNP (h)', 'Desv. Abertos'];
+  const linhas = [cab, ...KIT_LOTES.map(l => [
+    l.id || '', l.per || '', l.mes || '', l.q || '', l.dias ?? '',
+    l.plan ?? '', l.prod ?? '',
+    l.pnp !== null && l.pnp !== undefined ? l.pnp : '', l.desvAb ?? ''
+  ])];
+  const csv = linhas.map(l => l.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'kit_medico_lotes.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  if (typeof showToast === 'function') showToast('💾 CSV exportado');
+}
+
+// Monta os gráficos exclusivos do Kit Médico — deliberadamente à parte dos gráficos
+// do produto principal (LOTES): nenhuma função ou dataset é compartilhado entre eles.
+function buildKitCharts() {
+  const ids = KIT_LOTES.map(l => l.id || '—');
+
+  setChart('kit_vol', 'chartKitVol', {
+    type: 'bar',
+    data: { labels: ids, datasets: [
+      { label: 'Planejado', data: KIT_LOTES.map(l => l.plan ?? null), backgroundColor: 'rgba(79,142,247,0.3)', borderColor: clr.line1, borderWidth: 1.5 },
+      { label: 'Produzido', data: KIT_LOTES.map(l => l.prod ?? null), backgroundColor: 'rgba(34,212,150,0.3)', borderColor: clr.green, borderWidth: 1.5 }
+    ]},
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:14,padding:8,font:{size:10}}}}, scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid},ticks:{callback:v=>fNum(v)}}} }
+  });
+
+  setChart('kit_pnp', 'chartKitPNP', {
+    type: 'bar',
+    data: { labels: ids, datasets: [{
+      label: 'PNP (h)',
+      data: KIT_LOTES.map(l => l.pnp !== null && l.pnp !== undefined ? +l.pnp.toFixed(2) : null),
+      backgroundColor: KIT_LOTES.map(l => (l.pnp||0) > 6 ? 'rgba(240,64,96,0.5)' : (l.pnp||0) > 4 ? 'rgba(245,166,35,0.5)' : 'rgba(79,142,247,0.35)'),
+      borderColor: KIT_LOTES.map(l => (l.pnp||0) > 6 ? clr.red : (l.pnp||0) > 4 ? clr.amber : clr.line1),
+      borderWidth: 1.5
+    }]},
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid}}} }
+  });
+
+  setChart('kit_desvab', 'chartKitDesvAb', {
+    type: 'bar',
+    data: { labels: ids, datasets: [{
+      label: 'Desvios Abertos',
+      data: KIT_LOTES.map(l => l.desvAb ?? 0),
+      backgroundColor: 'rgba(155,107,255,0.35)',
+      borderColor: clr.purple,
+      borderWidth: 1.5
+    }]},
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid}}} }
+  });
+
+  // Gráficos de descarte por insumo — mesmo padrão visual da aba "Descarte de Insumos"
+  // do produto principal (barra + tendência em média móvel + média), porém com dados
+  // e função totalmente separados (KIT_LOTES / KIT_INSUMOS_META).
+  const container = document.getElementById('kitDescarteCharts');
+  if (container) {
+    container.innerHTML = '';
+    KIT_INSUMOS_META.forEach(ins => {
+      const pcts = KIT_LOTES.map(l => {
+        const qtd = l.insumos ? (l.insumos[ins.key] ?? null) : null;
+        if (!l.plan || qtd === null) return null;
+        const planejadoInsumo = l.plan * ins.prop;
+        return planejadoInsumo > 0 ? (qtd / planejadoInsumo * 100) : null;
+      });
+      const cores  = pcts.map(p => p===null?'rgba(100,100,120,0.3)': p>5?'rgba(239,68,68,0.5)':  p>1?'rgba(245,166,35,0.5)':  p>0?'rgba(79,142,247,0.5)':  'rgba(34,212,150,0.35)');
+      const bordas = pcts.map(p => p===null?'#555':                  p>5?'#ef4444':               p>1?'#f5a623':               p>0?'#4f8ef7':               '#22d496');
+      const tendencia = calcularTendencia(pcts);
+      const media = calcularMedia(pcts);
+
+      const wrap = document.createElement('div');
+      wrap.className = 'chart-panel';
+      const canvasId = 'chartKitDesc_' + ins.key;
+      wrap.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div class="chart-title">${ins.label}</div>
+          <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('kit_desc_${ins.key}','kit_medico_descarte_${ins.key}')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
+        </div>
+        <div class="chart-insight">% descartado em relação ao planejado · verde=0% · azul=&gt;0% · laranja=&gt;1% · vermelho=&gt;5%</div>
+        <div class="chart-wrap" style="height:220px"><canvas id="${canvasId}"></canvas></div>`;
+      container.appendChild(wrap);
+
+      setChart('kit_desc_' + ins.key, canvasId, {
+        type: 'bar',
+        data: { labels: ids, datasets: [
+          { type:'bar', label:'% Descarte', data: pcts.map(p=>p!==null?+p.toFixed(4):null), backgroundColor: cores, borderColor: bordas, borderWidth: 1.5, order: 3 },
+          { type:'line', label:'Tendência', data: tendencia, borderColor: clr.purple, backgroundColor:'transparent', borderWidth:2.25, pointRadius:0, tension:0.35, fill:false, order:1, trendSummary:{unit:'%',decimals:2} },
+          { type:'line', label:'Média', data: media, borderColor: clr.line3, backgroundColor:'transparent', borderWidth:1.5, borderDash:[2,2], pointRadius:0, tension:0, fill:false, order:2, trendSummary:{unit:'%',decimals:2,mode:'value',label:'Média'} }
+        ]},
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          plugins: {
+            legend: { display:true, position:'bottom', labels:{ filter:item=>item.text!=='% Descarte', boxWidth:14, padding:8, font:{size:10} } },
+            tooltip: { callbacks: { label: ctx => {
+              if (ctx.dataset.label !== '% Descarte') return ctx.dataset.label + ': ' + (ctx.parsed.y!==null?ctx.parsed.y.toFixed(4)+'%':'—');
+              const l = KIT_LOTES[ctx.dataIndex];
+              const un = l && l.insumos ? (l.insumos[ins.key] ?? '—') : '—';
+              return ctx.parsed.y!==null ? `${ctx.parsed.y.toFixed(4)}%  (${un} un. descartadas)` : 'Sem dados';
+            }}}
+          },
+          scales: { x:{grid:{color:clr.grid}}, y:{grid:{color:clr.grid},ticks:{callback:v=>v.toFixed(2)+'%'},beginAtZero:true} }
+        }
+      });
+    });
+  }
+
+  // Tabela de lotes
+  const tbody = document.getElementById('kitLotesTableBody');
+  if (tbody) {
+    if (!KIT_LOTES.length) {
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:24px">Nenhum lote de Kit Médico cadastrado ainda.</td></tr>';
+    } else {
+      tbody.innerHTML = KIT_LOTES.map(l => `
+        <tr>
+          <td><strong>${l.id || '—'}</strong></td>
+          <td style="color:var(--text2)">${l.per || '—'}</td>
+          <td style="color:var(--text2)">${l.mes || '—'}</td>
+          <td style="color:var(--text2)">${l.q || '—'}</td>
+          <td style="text-align:center">${l.dias ?? '—'}</td>
+          <td style="text-align:right">${l.plan != null ? fNum(l.plan) : '<span style="color:var(--text3)">N/D</span>'}</td>
+          <td style="text-align:right">${l.prod != null ? fNum(l.prod) : '<span style="color:var(--text3)">N/D</span>'}</td>
+          <td style="text-align:center">${l.pnp !== null && l.pnp !== undefined ? fH(l.pnp) : '<span style="color:var(--text3)">N/D</span>'}</td>
+          <td style="text-align:center">${l.desvAb ?? 0}</td>
+        </tr>`).join('');
+    }
+  }
+}
+
 function rebuildDashboard() {
   sortLotesCronologico();
   buildLoteSelector();
@@ -3162,6 +3395,7 @@ async function carregarLotes() {
   }
   sortLotesCronologico();
   initDashboard();
+  carregarKitLotesSupabase(); // carrega os dados do Kit Médico em paralelo — fonte de dados independente do produto principal
 }
 
 carregarLotes();
