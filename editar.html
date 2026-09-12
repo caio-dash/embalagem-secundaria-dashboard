@@ -875,6 +875,11 @@ select.cell option { background: var(--bg3); color: var(--text); }
       </div>
       <div class="chart-insight">Linha pontilhada indica a meta de 85%</div>
       <div class="chart-wrap" style="height:340px"><canvas id="chartOEEEvolucao" role="img" aria-label="Evolução do OEE por lote para todos os equipamentos" style="box-sizing: border-box; display: block; height: 340px; width: 1310px;" width="1310" height="340"></canvas></div>
+      <div style="margin-top:12px;padding:10px 14px;background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.3);border-radius:8px;font-size:12px;line-height:1.6;color:var(--text2)">
+        📊 <strong style="color:var(--text)">Referências de mercado:</strong>
+        a faixa destacada em laranja (<strong>60%–70%</strong>) representa a <strong>média de OEE das indústrias farmacêuticas no Brasil</strong>.
+        A meta de <strong>85%</strong> (linha tracejada verde) corresponde ao patamar do <strong>top 10% das farmacêuticas a nível mundial</strong>.
+      </div>
     </div>
   </div>
 
@@ -1722,8 +1727,16 @@ const refBandPlugin = {
 };
 Chart.register(refBandPlugin);
 
-function oeeColor(v) { if(v>=0.85) return clr.green; if(v>=0.60) return clr.amber; if(v>=0.50) return clr.line3; return clr.red; }
-function oeeColor2(v01) { if(v01>=0.85) return clr.green; if(v01>=0.6) return clr.amber; return clr.red; }
+function oeeColor(v) {
+  // Escala calibrada por referências de mercado: <60% abaixo da média BR,
+  // 60–70% média das farmacêuticas no Brasil, 70–85% acima da média BR,
+  // ≥85% patamar mundial (top 10% das farmacêuticas globalmente).
+  if (v >= 0.85) return clr.green;
+  if (v >= 0.70) return clr.line1;
+  if (v >= 0.60) return clr.amber;
+  return clr.red;
+}
+function oeeColor2(v01) { return oeeColor(v01); }
 function oeeClass(v) { if(v===undefined||v===null) return ''; if(v>=0.85) return 'good'; if(v>=0.60) return 'warn'; return 'bad'; }
 
 // Registro global de instâncias Chart.js (permite reconstrução segura)
@@ -2714,9 +2727,9 @@ function buildOEE() {
       {label:'Esteira',data:oeeLotes.map(l=>+(l.oee.esteira*100).toFixed(1)),borderColor:clr.green,backgroundColor:'transparent',tension:.3,pointRadius:4},
       {label:'BLA',data:oeeLotes.map(l=>+(l.oee.bla*100).toFixed(1)),borderColor:clr.amber,backgroundColor:'transparent',tension:.3,pointRadius:4,borderDash:[6,3]},
       {label:'Unitizadora',data:oeeLotes.map(l=>+(l.oee.unit*100).toFixed(1)),borderColor:clr.teal,backgroundColor:'transparent',tension:.3,pointRadius:4,borderDash:[2,2]},
-      {label:'Meta 85%',data:oeeLotes.map(()=>85),borderColor:'rgba(255,255,255,0.2)',borderDash:[5,5],pointRadius:0,fill:false}
+      {label:'Meta 85% (Top 10% mundial)',data:oeeLotes.map(()=>85),borderColor:'rgba(34,212,150,0.6)',borderDash:[5,5],pointRadius:0,fill:false,trendSummary:{unit:'%',decimals:0,mode:'value',label:'Meta'}}
     ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{color:clr.text,boxWidth:12,usePointStyle:true}}},scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid},min:30,max:95,ticks:{callback:v=>v+'%'}}}}
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{color:clr.text,boxWidth:12,usePointStyle:true}},refBand:{min:60,max:70,visible:true,color:'rgba(245,166,35,0.14)',borderColor:'rgba(245,166,35,0.55)',label:'Média BR: 60%–70%'}},scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid},min:30,max:95,ticks:{callback:v=>v+'%'}}}}
   });
 
   // Heatmap table
@@ -2729,8 +2742,8 @@ function buildOEE() {
     tr.innerHTML = `<td><strong>${l.id.replace('261001','')||'—'}</strong></td><td style="color:var(--text2);font-size:11px">${l.per||'—'}</td>` +
       EQUIPAMENTOS.map(eq => {
         const v = o[eq]; const pct = Math.round(v*100);
-        const bg = v>=0.85?'rgba(34,212,150,0.15)':v>=0.60?'rgba(245,166,35,0.15)':v>=0.50?'rgba(240,64,96,0.10)':'rgba(240,64,96,0.20)';
-        const fg = v>=0.85?clr.green:v>=0.60?clr.amber:clr.red;
+        const bg = v>=0.85?'rgba(34,212,150,0.15)':v>=0.70?'rgba(79,142,247,0.15)':v>=0.60?'rgba(245,166,35,0.15)':'rgba(240,64,96,0.15)';
+        const fg = oeeColor(v);
         return `<td style="text-align:center;background:${bg}"><span style="color:${fg};font-weight:600">${pct}%</span></td>`;
       }).join('');
     tbody.appendChild(tr);
@@ -2741,7 +2754,7 @@ function buildOEE() {
     EQUIPAMENTOS.map(eq => {
       const med = oeeLotes.reduce((a,l)=>a+l.oee[eq],0)/oeeLotes.length;
       const pct = (med*100).toFixed(1);
-      const fg = med>=0.85?clr.green:med>=0.60?clr.amber:clr.red;
+      const fg = oeeColor(med);
       return `<td style="text-align:center;border-top:1px solid var(--border2)"><strong style="color:${fg}">${pct}%</strong></td>`;
     }).join('');
   tbody.appendChild(trMed);
