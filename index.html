@@ -2268,7 +2268,33 @@ function buildOEE() {
       {label:'Unitizadora',data:oeeLotes.map(l=>+(l.oee.unit*100).toFixed(1)),borderColor:clr.teal,backgroundColor:'transparent',tension:.3,pointRadius:4,borderDash:[2,2]},
       {label:'Meta 85% (Top 10% mundial)',data:oeeLotes.map(()=>85),borderColor:'rgba(34,212,150,0.6)',borderDash:[5,5],pointRadius:0,fill:false,trendSummary:{unit:'%',decimals:0,mode:'value',label:'Meta'}}
     ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{color:clr.text,boxWidth:12,usePointStyle:true}},refBand:{min:60,max:70,visible:true,color:'rgba(245,166,35,0.14)',borderColor:'rgba(245,166,35,0.55)',label:'Média BR: 60%–70%'}},scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid},min:30,max:95,ticks:{callback:v=>v+'%'}}}}
+    options:{responsive:true,maintainAspectRatio:false,plugins:{
+      legend:{
+        display:true,
+        labels:{
+          color:clr.text, boxWidth:12, usePointStyle:true,
+          generateLabels:(chart)=>{
+            const base = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+            const bandOpts = chart.options.plugins.refBand;
+            if (bandOpts && bandOpts.min!=null && bandOpts.max!=null) {
+              base.push({ text:'Faixa média BR', fillStyle:bandOpts.color||'rgba(245,166,35,0.4)', strokeStyle:bandOpts.borderColor||'rgba(245,166,35,0.8)', lineWidth:1.5, hidden:bandOpts.visible===false, datasetIndex:-1 });
+            }
+            return base;
+          }
+        },
+        onClick:(e,legendItem,legend)=>{
+          const chart = legend.chart;
+          if (legendItem.datasetIndex===-1) {
+            const bandOpts = chart.options.plugins.refBand;
+            bandOpts.visible = bandOpts.visible===false ? true : false;
+            chart.update();
+            return;
+          }
+          Chart.defaults.plugins.legend.onClick.call(legend,e,legendItem,legend);
+        }
+      },
+      refBand:{min:60,max:70,visible:true,color:'rgba(245,166,35,0.14)',borderColor:'rgba(245,166,35,0.55)',label:'Média BR: 60%–70%'}
+    },scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid},min:30,max:95,ticks:{callback:v=>v+'%'}}}}
   });
 
   // Heatmap table
