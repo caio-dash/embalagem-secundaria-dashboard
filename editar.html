@@ -1002,6 +1002,7 @@ select.cell option { background: var(--bg3); color: var(--text); }
     <button class="btn btn-primary" onclick="applyChanges()">↻ Atualizar Dashboard</button>
     <button class="btn btn-secondary" onclick="addSheetRow()">+ Adicionar Lote</button>
     <button class="btn btn-primary" style="background:var(--green2)" onclick="baixarHTMLAtualizado()">💾 Baixar HTML</button>
+    <button type="button" class="lote-btn" onclick="abrirBackupsModal()" title="Ver e restaurar cópias de segurança automáticas">🕐 Backups</button>
     <span id="sheetSyncStatus" style="font-size:11px;color:var(--text3);margin-left:4px"></span>
     <span class="sheet-hint">OEE em % (ex.: 69 = 69%). Deixe PNP ou OEE em branco para "sem dados". Ao digitar o Período (dd–dd/mmm ou dd/mmm–dd/mmm) e sair do campo, Mês/Trim./Dias ⚡ são calculados automaticamente (dias úteis, sem sáb./dom.).</span>
   </div>
@@ -1420,6 +1421,21 @@ select.cell option { background: var(--bg3); color: var(--text); }
       <button type="button" class="lote-btn" onclick="fecharZoomChart()">✕ Fechar</button>
     </div>
     <div class="chart-zoom-body"><canvas id="chartZoomCanvas"></canvas></div>
+  </div>
+</div>
+
+<div id="backupsModal" class="chart-zoom-modal" onclick="if(event.target===this) fecharBackupsModal()">
+  <div class="chart-zoom-content" style="max-width:720px">
+    <div class="chart-zoom-header">
+      <div class="chart-zoom-title">🕐 Backups automáticos</div>
+      <button type="button" class="lote-btn" onclick="fecharBackupsModal()">✕ Fechar</button>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Uma cópia é salva automaticamente sempre que os dados são gravados na nuvem. Restaurar substitui os dados atuais pelos do backup escolhido (uma nova cópia de segurança do estado atual é feita antes de restaurar).</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button type="button" class="lote-btn active" id="backupsTabLotes" onclick="mostrarBackups('lotes', this)">Linha Principal</button>
+      <button type="button" class="lote-btn" id="backupsTabKit" onclick="mostrarBackups('kit_medico_lotes', this)">Kit Médico</button>
+    </div>
+    <div id="backupsLista" style="max-height:55vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px"></div>
   </div>
 </div>
 
@@ -3343,6 +3359,8 @@ async function salvarKitLotesSupabase() {
   const { data: sessao } = await sb.auth.getSession();
   if (!sessao?.session) return;
 
+  await criarBackup('kit_medico_lotes'); // backup automático do estado atual, antes de sobrescrever
+
   const rows = KIT_LOTES.map(l => ({
     id: l.id || ('kit_novo_' + Date.now() + '_' + Math.random().toString(36).slice(2,6)),
     dados: l,
@@ -4395,10 +4413,88 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
 });
 
 
+// Cria uma cópia de segurança da tabela ANTES de sobrescrevê-la — permite reverter
+// caso algo seja salvo por engano. Nunca interrompe o fluxo de salvamento se falhar.
+async function criarBackup(tabela) {
+  if (!sb) return;
+  try {
+    const { data, error } = await sb.from(tabela).select('*');
+    if (error || !data) return;
+    await sb.from('backups').insert([{
+      tabela,
+      email: currentUserEmail || null,
+      n_registros: data.length,
+      dados: data
+    }]);
+  } catch (e) {
+    console.error('Erro ao criar backup de ' + tabela + ':', e);
+  }
+}
+
+function abrirBackupsModal() {
+  const modal = document.getElementById('backupsModal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  mostrarBackups('lotes', document.getElementById('backupsTabLotes'));
+}
+
+function fecharBackupsModal() {
+  const modal = document.getElementById('backupsModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function mostrarBackups(tabela, btnEl) {
+  document.querySelectorAll('#backupsModal .lote-btn').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+  const lista = document.getElementById('backupsLista');
+  if (!lista) return;
+  if (!sb) { lista.innerHTML = '<div style="color:var(--text3);padding:16px;text-align:center">Sem conexão com o servidor.</div>'; return; }
+  lista.innerHTML = '<div style="color:var(--text3);padding:16px;text-align:center">Carregando…</div>';
+  const { data, error } = await sb.from('backups').select('id,created_at,email,n_registros').eq('tabela', tabela).order('created_at', { ascending: false }).limit(30);
+  if (error) { lista.innerHTML = `<div style="color:#ef4444;padding:16px;text-align:center">Erro ao carregar: ${error.message}</div>`; return; }
+  if (!data || !data.length) { lista.innerHTML = '<div style="color:var(--text3);padding:16px;text-align:center">Nenhum backup encontrado ainda.</div>'; return; }
+  lista.innerHTML = data.map(b => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px">
+      <div>
+        <div style="font-size:13px;color:var(--text)">${new Date(b.created_at).toLocaleString('pt-BR')}</div>
+        <div style="font-size:11px;color:var(--text3)">${b.n_registros} registro${b.n_registros !== 1 ? 's' : ''}${b.email ? ' · ' + b.email : ''}</div>
+      </div>
+      <button type="button" class="lote-btn" onclick="restaurarBackup('${tabela}', ${b.id})">↺ Restaurar</button>
+    </div>`).join('');
+}
+
+async function restaurarBackup(tabela, backupId) {
+  const rotulo = tabela === 'lotes' ? 'da Linha Principal' : 'do Kit Médico';
+  if (!confirm(`Restaurar este backup ${rotulo}? Os dados atuais serão substituídos (uma cópia do estado atual será salva antes, então nada se perde).`)) return;
+  const { data, error } = await sb.from('backups').select('dados').eq('id', backupId).single();
+  if (error || !data) { alert('Não foi possível carregar esse backup.'); return; }
+  const linhas = data.dados; // array de {id, dados, updated_at} — mesmo formato salvo na tabela original
+
+  if (tabela === 'lotes') {
+    await criarBackup('lotes'); // salva o estado atual antes de sobrescrever
+    LOTES = linhas.map(r => r.dados).filter(Boolean);
+    sortLotesCronologico();
+    rebuildDashboard();
+    renderSheet();
+    await salvarLotesSupabase();
+  } else {
+    await criarBackup('kit_medico_lotes');
+    KIT_LOTES = linhas.map(r => r.dados).filter(Boolean);
+    sortKitLotesCronologico();
+    renderKitSheet();
+    buildKitCharts();
+    await salvarKitLotesSupabase();
+  }
+  fecharBackupsModal();
+  showToast('✓ Backup restaurado com sucesso');
+}
+
 async function salvarLotesSupabase(silencioso) {
   if (!silencioso) setSyncStatus('⟳ salvando…');
   const { data: sessao } = await sb.auth.getSession();
   if (!sessao?.session) return; // não autenticado, ignora
+
+  await criarBackup('lotes'); // backup automático do estado atual, antes de sobrescrever
 
   // Upsert: insere ou atualiza cada lote pelo id
   const rows = LOTES.map(l => ({
