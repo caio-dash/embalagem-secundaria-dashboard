@@ -389,7 +389,7 @@ select.cell option { background: var(--bg3); color: var(--text); }
 <div id="sec-comparativo" class="section">
   <div class="page-header">
     <div class="page-title">Comparativo entre Lotes</div>
-    <div class="page-sub">Performance relativa dos lotes produzidos em 2026</div>
+    <div class="page-sub" id="compPageSubAno">Performance relativa dos lotes produzidos em 2026</div>
   </div>
 
   <!-- Filtros -->
@@ -426,7 +426,7 @@ select.cell option { background: var(--bg3); color: var(--text); }
   </div>
 
   <div class="summary-box">
-    <h3>Resumo Geral — Base 2026</h3>
+    <h3 id="resumoGeralAno">Resumo Geral — Base 2026</h3>
     <div class="summary-grid">
       <div class="summary-item"><strong id="sumProd">349.742</strong><span>Unidades produzidas</span></div>
       <div class="summary-item"><strong id="sumPlan">349.818</strong><span>Unidades planejadas</span></div>
@@ -438,7 +438,7 @@ select.cell option { background: var(--bg3); color: var(--text); }
   <!-- Progresso Acumulado Anual -->
   <div class="chart-panel" style="margin-bottom:20px">
     <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
-      <div class="chart-title">Progresso acumulado de lotes — 2026</div>
+      <div class="chart-title" id="progressoAnualTituloAno">Progresso acumulado de lotes — 2026</div>
       <div id="progressoBadges" style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto"></div>
       <button type="button" class="lote-btn" style="padding:4px 10px;font-size:11px;white-space:nowrap" onclick="exportarChartCSV('progressoAnual','progresso_acumulado_anual')" title="Exportar dados deste gráfico em CSV">⭳ CSV</button>
     </div>
@@ -1155,9 +1155,32 @@ let LOTES = [
   }
 })();
 
-const MES_ORDER = ['Jan/26','Fev/26','Mar/26','Abr/26','Mai/26','Jun/26','Jul/26','Ago/26','Set/26','Out/26','Nov/26','Dez/26'];
+// ANO_MIN é o ano de início de operação desta linha (2026) — ponto fixo usado como
+// referência de índice para MES_ORDER. ANO_MAX se estende automaticamente 2 anos à
+// frente da data atual, então o dashboard continua funcionando nas próximas viradas
+// de ano sem precisar de nenhum ajuste manual no código.
+const ANO_MIN = 2026;
+const ANO_MAX = new Date().getFullYear() + 2;
+function gerarMesOrder(anoMin, anoMax) {
+  const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const arr = [];
+  for (let a = anoMin; a <= anoMax; a++) {
+    nomes.forEach(m => arr.push(m + '/' + String(a).slice(-2)));
+  }
+  return arr;
+}
+const MES_ORDER = gerarMesOrder(ANO_MIN, ANO_MAX);
 const MES_ABREV = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-const BASE_YEAR = 2026;
+// BASE_YEAR: ano assumido para períodos digitados sem indicação explícita de ano
+// (ex.: preenchimento automático de um lote novo) — segue o ano corrente, então
+// também não precisa de ajuste manual na virada do ano.
+const BASE_YEAR = new Date().getFullYear();
+// Extrai o ano (4 dígitos) a partir de um rótulo de mês no formato "Mmm/AA" (ex.: "Jan/27" → 2027)
+function anoDoMes(mesStr) {
+  if (!mesStr) return BASE_YEAR;
+  const m = String(mesStr).match(/\/(\d{2})$/);
+  return m ? 2000 + (+m[1]) : BASE_YEAR;
+}
 const Q_ORDER = ['Q1','Q2','Q3','Q4'];
 const Q_NOMES = {Q1:'Q1 (Jan–Mar)', Q2:'Q2 (Abr–Jun)', Q3:'Q3 (Jul–Set)', Q4:'Q4 (Out–Dez)'};
 const EQUIPAMENTOS = ['rot1','rot2','esteira','bla','unit'];
@@ -1627,10 +1650,7 @@ function setCompGranularidade(tipo, el) {
 function inicializarCompFiltros() {
   if (!document.getElementById('compDeAno')) return;
 
-  const anos = [...new Set(LOTES.map(l => {
-    const m = (l.per || '').match(/\d{4}/);
-    return m ? +m[0] : BASE_YEAR;
-  }))].sort();
+  const anos = [...new Set(LOTES.map(l => anoDoMes(l.mes)))].sort();
   if (!anos.length) anos.push(BASE_YEAR);
   const anosHtml = anos.map(a => `<option value="${a}">${a}</option>`).join('');
   const mesesHtml = NOMES_MESES.map((n, i) => `<option value="${i}">${n}</option>`).join('');
@@ -1668,16 +1688,16 @@ function filtrarLotesComparativo() {
 
   return LOTES.filter(l => {
     if (compFiltroConc !== 'all' && (l.conc || '') !== compFiltroConc) return false;
-    const r = perToDateRange(l.per);
+    const r = perToDateRange(l.per, anoDoMes(l.mes));
     if (!r) {
       const idx = MES_ORDER.indexOf(l.mes);
-      const iDe = de.getMonth() + (de.getFullYear() - BASE_YEAR) * 12;
-      const iAte = ate.getMonth() + (ate.getFullYear() - BASE_YEAR) * 12;
+      const iDe = de.getMonth() + (de.getFullYear() - ANO_MIN) * 12;
+      const iAte = ate.getMonth() + (ate.getFullYear() - ANO_MIN) * 12;
       return idx >= iDe && idx <= iAte;
     }
     return r.inicio <= ate && r.fim >= de;
   }).sort((a, b) => {
-    const ra = perToDateRange(a.per), rb = perToDateRange(b.per);
+    const ra = perToDateRange(a.per, anoDoMes(a.mes)), rb = perToDateRange(b.per, anoDoMes(b.mes));
     if (ra && rb) return ra.inicio - rb.inicio;
     if (ra) return -1;
     if (rb) return 1;
@@ -1820,11 +1840,15 @@ function buildComparativo() {
     // Meta linear: lotes acumulados esperados por semana
     const metaAcum = semanas.map((_, i) => +((i + 1) / nSem * META_LOTES_ANO).toFixed(2));
 
-    // Para cada lote, determina a semana em que foi CONCLUÍDO (data fim do período)
-    const lotesConcluidos = lotesFiltrados.map(l => {
-      const r = perToDateRange(l.per);
-      return r ? r.fim : null;
-    }).filter(Boolean).sort((a, b) => a - b);
+    // Para cada lote DO ANO DE REFERÊNCIA, determina a semana em que foi CONCLUÍDO
+    // (data fim do período) — filtra por ano para não misturar lotes de anos diferentes
+    // no mesmo gráfico quando os dados já abrangerem mais de um ano (ex.: 2026 e 2027).
+    const lotesConcluidos = lotesFiltrados
+      .filter(l => anoDoMes(l.mes) === anoRef)
+      .map(l => {
+        const r = perToDateRange(l.per, anoRef);
+        return r ? r.fim : null;
+      }).filter(Boolean).sort((a, b) => a - b);
 
     // Conta lotes concluídos acumulados por semana
     const realAcum = semanas.map(semIni => {
@@ -2046,12 +2070,9 @@ function customMesChange(qual) {
 }
 
 function inicializarCustomRange() {
-  // Anos disponíveis: derivados dos lotes, ou 2026 como padrão
-  const anos = [...new Set(LOTES.map(l => {
-    const m = (l.per||'').match(/\d{4}/);
-    return m ? +m[0] : 2026;
-  }))].sort();
-  if (!anos.length) anos.push(2026);
+  // Anos disponíveis: derivados dos lotes, ou o ano corrente como padrão
+  const anos = [...new Set(LOTES.map(l => anoDoMes(l.mes)))].sort();
+  if (!anos.length) anos.push(BASE_YEAR);
   const anosHtml = anos.map(a=>`<option value="${a}">${a}</option>`).join('');
 
   const mesesHtml = NOMES_MESES.map((n,i)=>`<option value="${i}">${n}</option>`).join('');
@@ -2066,7 +2087,7 @@ function inicializarCustomRange() {
 
   const mesIdxDe = primeiro ? MES_ORDER.indexOf(primeiro.mes) : 0;
   const mesIdxAte = ultimo ? MES_ORDER.indexOf(ultimo.mes) : 11;
-  const anoDe = 2026, anoAte = 2026;
+  const anoDe = anos[0] ?? BASE_YEAR, anoAte = anos[anos.length - 1] ?? BASE_YEAR;
 
   document.getElementById('cDeAno').value  = anoDe;
   document.getElementById('cDeMes').value  = mesIdxDe < 0 ? 0 : mesIdxDe;
@@ -2082,12 +2103,15 @@ function inicializarCustomRange() {
 function getDataCustom(prefixo) {
   const dia  = +document.getElementById(prefixo+'Dia').value  || 1;
   const mes  = +document.getElementById(prefixo+'Mes').value;  // 0-based
-  const ano  = +document.getElementById(prefixo+'Ano').value  || 2026;
+  const ano  = +document.getElementById(prefixo+'Ano').value  || BASE_YEAR;
   return new Date(ano, mes, dia);
 }
 
-// Converte "dd–dd/mmm" ou "dd/mmm–dd/mmm" (do campo per) em {inicio, fim} como Date
-function perToDateRange(per) {
+// Converte "dd–dd/mmm" ou "dd/mmm–dd/mmm" (do campo per) em {inicio, fim} como Date.
+// anoRef permite informar o ano correto do lote (evita assumir sempre o ano atual
+// quando os dados já abrangem mais de um ano — ex.: um lote de Dez/26 vs Jan/27).
+function perToDateRange(per, anoRef) {
+  const ano = anoRef || BASE_YEAR;
   const p = parsePeriodo(per);
   if (!p) return null;
   const s = per.trim().replace(/–/g,'-');
@@ -2100,14 +2124,14 @@ function perToDateRange(per) {
     if (!m) return null;
     d1=+m[1]; d2=+m[2]; mi1=mi2=indiceMes(m[3]);
   }
-  ano2 = mi2 < mi1 ? BASE_YEAR+1 : BASE_YEAR;
-  return { inicio: new Date(BASE_YEAR, mi1, d1), fim: new Date(ano2, mi2, d2) };
+  ano2 = mi2 < mi1 ? ano+1 : ano;
+  return { inicio: new Date(ano, mi1, d1), fim: new Date(ano2, mi2, d2) };
 }
 
 // Filtra lotes cujo período tem sobreposição com [dataInicio, dataFim]
 function lotesNoPeriodoData(dataInicio, dataFim) {
   return LOTES.filter(l => {
-    const r = perToDateRange(l.per);
+    const r = perToDateRange(l.per, anoDoMes(l.mes));
     if (!r) {
       // fallback: compara só por mês
       const idx = MES_ORDER.indexOf(l.mes);
@@ -2681,7 +2705,7 @@ function ordenarInsumosCronologico(dados) {
   // Mapeia lote → data de início
   const loteData = {};
   LOTES.forEach(l => {
-    const r = perToDateRange(l.per);
+    const r = perToDateRange(l.per, anoDoMes(l.mes));
     if (r) loteData[l.id] = r.inicio;
   });
   return [...dados].sort((a, b) => {
@@ -2717,10 +2741,7 @@ function setDescGranularidade(tipo, el) {
 function inicializarDescFiltros() {
   if (!document.getElementById('descDeAno')) return;
 
-  const anos = [...new Set(LOTES.map(l => {
-    const m = (l.per || '').match(/\d{4}/);
-    return m ? +m[0] : BASE_YEAR;
-  }))].sort();
+  const anos = [...new Set(LOTES.map(l => anoDoMes(l.mes)))].sort();
   if (!anos.length) anos.push(BASE_YEAR);
   const anosHtml = anos.map(a => `<option value="${a}">${a}</option>`).join('');
   const mesesHtml = NOMES_MESES.map((n, i) => `<option value="${i}">${n}</option>`).join('');
@@ -2754,12 +2775,14 @@ function grupoDoLote(l, granularidade) {
   if (granularidade === 'mensal') {
     return { key: l.mes, label: l.mes, order: MES_ORDER.indexOf(l.mes) };
   }
+  const ano = anoDoMes(l.mes);
   if (granularidade === 'trimestral') {
-    return { key: l.q, label: Q_NOMES[l.q] || l.q, order: Q_ORDER.indexOf(l.q) };
+    // Chave inclui o ano para não misturar, por exemplo, Q1 de 2026 com Q1 de 2027
+    return { key: l.q + '-' + ano, label: (Q_NOMES[l.q] || l.q) + ' ' + ano, order: ano*10 + Q_ORDER.indexOf(l.q) };
   }
   if (granularidade === 'semestral') {
     const s = semestreDoMes(l.mes);
-    return { key: s, label: S_NOMES[s] || s, order: S_ORDER.indexOf(s) };
+    return { key: s + '-' + ano, label: (S_NOMES[s] || s) + ' ' + ano, order: ano*10 + S_ORDER.indexOf(s) };
   }
   return null;
 }
@@ -2992,11 +3015,11 @@ function buildDescarte() {
     .filter(({ l }) => {
       if (!filtroValido) return false;
       if (!l) return true; // sem lote correspondente (ex.: C005) — mantém, não é possível filtrar por data
-      const r = perToDateRange(l.per);
+      const r = perToDateRange(l.per, anoDoMes(l.mes));
       if (!r) {
         const idx = MES_ORDER.indexOf(l.mes);
-        const iDe = de.getMonth() + (de.getFullYear() - BASE_YEAR) * 12;
-        const iAte = ate.getMonth() + (ate.getFullYear() - BASE_YEAR) * 12;
+        const iDe = de.getMonth() + (de.getFullYear() - ANO_MIN) * 12;
+        const iAte = ate.getMonth() + (ate.getFullYear() - ANO_MIN) * 12;
         return idx >= iDe && idx <= iAte;
       }
       return r.inicio <= ate && r.fim >= de;
@@ -3004,8 +3027,8 @@ function buildDescarte() {
 
   // Ordena cronologicamente
   itens = itens.sort((a, b) => {
-    const ra = a.l ? perToDateRange(a.l.per) : null;
-    const rb = b.l ? perToDateRange(b.l.per) : null;
+    const ra = a.l ? perToDateRange(a.l.per, anoDoMes(a.l.mes)) : null;
+    const rb = b.l ? perToDateRange(b.l.per, anoDoMes(b.l.mes)) : null;
     if (ra && rb) return ra.inicio - rb.inicio;
     if (ra) return -1;
     if (rb) return 1;
@@ -3160,7 +3183,7 @@ function buildDescarte() {
 // ═══════════════════════════════════════════════════════════════════
 function sortLotesCronologico() {
   LOTES.sort((a, b) => {
-    const ra = perToDateRange(a.per), rb = perToDateRange(b.per);
+    const ra = perToDateRange(a.per, anoDoMes(a.mes)), rb = perToDateRange(b.per, anoDoMes(b.mes));
     if (ra && rb) return ra.inicio - rb.inicio;
     if (ra) return -1;
     if (rb) return 1;
@@ -3185,7 +3208,7 @@ const KIT_INSUMOS_META = [
 
 function sortKitLotesCronologico() {
   KIT_LOTES.sort((a, b) => {
-    const ra = perToDateRange(a.per), rb = perToDateRange(b.per);
+    const ra = perToDateRange(a.per, anoDoMes(a.mes)), rb = perToDateRange(b.per, anoDoMes(b.mes));
     if (ra && rb) return ra.inicio - rb.inicio;
     if (ra) return -1;
     if (rb) return 1;
@@ -3351,6 +3374,7 @@ function rebuildDashboard() {
   renderLote(LOTES[0]);
   updateNavBadge();
   atualizarBadgePendentes();
+  atualizarRotulosAno();
 
   const activeSection = document.querySelector('.section.active')?.id;
   if(activeSection==='sec-comparativo') buildComparativo();
@@ -3372,6 +3396,24 @@ function showToast(mensagem) {
 // ═══════════════════════════════════════════════════════════════════
 // INIT — chamado apenas após autenticação confirmada pelo Supabase
 // ═══════════════════════════════════════════════════════════════════
+// Atualiza os textos fixos "2026" espalhados pela interface para refletir o(s) ano(s)
+// realmente presentes nos dados (ex.: "2026–2027" quando já houver lotes dos dois anos).
+function atualizarRotulosAno() {
+  const anosPresentes = [...new Set(LOTES.map(l => anoDoMes(l.mes)))].filter(Boolean).sort((a, b) => a - b);
+  const rotulo = anosPresentes.length > 1
+    ? `${anosPresentes[0]}–${anosPresentes[anosPresentes.length - 1]}`
+    : String(anosPresentes[0] || BASE_YEAR);
+
+  const compSub = document.getElementById('compPageSubAno');
+  if (compSub) compSub.textContent = 'Performance relativa dos lotes produzidos em ' + rotulo;
+
+  const resumoH3 = document.getElementById('resumoGeralAno');
+  if (resumoH3) resumoH3.textContent = 'Resumo Geral — Base ' + rotulo;
+
+  const progTitulo = document.getElementById('progressoAnualTituloAno');
+  if (progTitulo) progTitulo.textContent = 'Progresso acumulado de lotes — ' + rotulo;
+}
+
 function initDashboard() {
   sortLotesCronologico();
   updateNavBadge();
@@ -3381,6 +3423,7 @@ function initDashboard() {
   inicializarDescFiltros();
   inicializarCompFiltros();
   atualizarBadgePendentes();
+  atualizarRotulosAno();
 
   // Ativa a aba "Por Lote" como padrão
   const primeiraAba = document.querySelector('.nav-tab');
