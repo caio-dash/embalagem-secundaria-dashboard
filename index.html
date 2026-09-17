@@ -86,7 +86,7 @@ main { max-width: 1400px; margin: 0 auto; padding: 28px 24px; }
 .kpi-delta { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; padding: 2px 7px; border-radius: 4px; margin-top: 6px; }
 .kpi-delta.pos { background: rgba(34,212,150,0.12); color: var(--green); }
 .kpi-delta.neg { background: rgba(240,64,96,0.12); color: var(--red); }
-.kpi-delta.neu { background: rgba(138,148,176,0.12); color: var(--text2); }
+.kpi-delta.neu, .kpi-delta.neutral { background: rgba(138,148,176,0.12); color: var(--text2); }
 
 /* CHART CONTAINERS */
 .chart-row { display: grid; gap: 16px; margin-bottom: 20px; }
@@ -428,10 +428,10 @@ select.cell option { background: var(--bg3); color: var(--text); }
   <div class="summary-box">
     <h3 id="resumoGeralAno">Resumo Geral — Base 2026</h3>
     <div class="summary-grid">
-      <div class="summary-item"><strong id="sumProd">349.742</strong><span>Unidades produzidas</span></div>
-      <div class="summary-item"><strong id="sumPlan">349.818</strong><span>Unidades planejadas</span></div>
-      <div class="summary-item"><strong id="sumDesc">76</strong><span>Unidades descartadas</span></div>
-      <div class="summary-item"><strong id="sumPct">0,022%</strong><span>Índice médio de perdas</span></div>
+      <div class="summary-item"><strong id="sumProd">349.742</strong><span>Unidades produzidas</span><span id="sumProdDelta" class="kpi-delta"></span></div>
+      <div class="summary-item"><strong id="sumPlan">349.818</strong><span>Unidades planejadas</span><span id="sumPlanDelta" class="kpi-delta"></span></div>
+      <div class="summary-item"><strong id="sumDesc">76</strong><span>Unidades descartadas</span><span id="sumDescDelta" class="kpi-delta"></span></div>
+      <div class="summary-item"><strong id="sumPct">0,022%</strong><span>Índice médio de perdas</span><span id="sumPctDelta" class="kpi-delta"></span></div>
     </div>
   </div>
 
@@ -1705,6 +1705,63 @@ function filtrarLotesComparativo() {
   });
 }
 
+function filtrarLotesPorIntervalo(de, ate) {
+  return LOTES.filter(l => {
+    if (compFiltroConc !== 'all' && (l.conc || '') !== compFiltroConc) return false;
+    const r = perToDateRange(l.per, anoDoMes(l.mes));
+    if (!r) {
+      const idx = MES_ORDER.indexOf(l.mes);
+      const iDe = de.getMonth() + (de.getFullYear() - ANO_MIN) * 12;
+      const iAte = ate.getMonth() + (ate.getFullYear() - ANO_MIN) * 12;
+      return idx >= iDe && idx <= iAte;
+    }
+    return r.inicio <= ate && r.fim >= de;
+  }).sort((a, b) => {
+    const ra = perToDateRange(a.per, anoDoMes(a.mes)), rb = perToDateRange(b.per, anoDoMes(b.mes));
+    if (ra && rb) return ra.inicio - rb.inicio;
+    if (ra) return -1;
+    if (rb) return 1;
+    return 0;
+  });
+}
+
+// Calcula o intervalo imediatamente anterior, com a mesma duração do intervalo atual —
+// usado para comparar os KPIs com o "período anterior".
+function periodoAnterior(de, ate) {
+  const duracaoMs = ate.getTime() - de.getTime();
+  const anteAte = new Date(de.getTime() - 24 * 60 * 60 * 1000);
+  const anteDe = new Date(anteAte.getTime() - duracaoMs);
+  return { de: anteDe, ate: anteAte };
+}
+
+// Renderiza a seta e o percentual de variação de um KPI num elemento <span>.
+// favoravel: 'alta' (subir é bom, ex. produção) ou 'baixa' (subir é ruim, ex. descarte).
+function renderKpiDelta(elId, atual, anterior, favoravel) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (anterior === null || anterior === undefined || atual === null) {
+    el.textContent = 'sem dado do período anterior';
+    el.className = 'kpi-delta neutral';
+    return;
+  }
+  if (anterior === 0) {
+    el.textContent = atual === 0 ? '► estável vs. período anterior' : '▲ novo (período anterior sem dado)';
+    el.className = 'kpi-delta neutral';
+    return;
+  }
+  const variacaoPct = ((atual - anterior) / Math.abs(anterior)) * 100;
+  if (Math.abs(variacaoPct) < 0.05) {
+    el.textContent = '► estável vs. período anterior';
+    el.className = 'kpi-delta neutral';
+    return;
+  }
+  const subiu = variacaoPct > 0;
+  const seta = subiu ? '▲' : '▼';
+  const favoravelResultado = favoravel === 'alta' ? subiu : !subiu;
+  el.className = 'kpi-delta ' + (favoravelResultado ? 'pos' : 'neg');
+  el.textContent = `${seta} ${Math.abs(variacaoPct).toFixed(1).replace('.', ',')}% vs. período anterior`;
+}
+
 // Agrupa os lotes filtrados em mês/trimestre/semestre, somando volumes e fazendo média
 // dos indicadores de tempo/OEE — usado pelo Comparativo quando a granularidade não é "lote".
 function agregarLotesComparativo(lotesFiltrados) {
@@ -1749,12 +1806,25 @@ function buildComparativo() {
 
   const lotesFiltrados = filtrarLotesComparativo();
 
+  // Período anterior (mesma duração, imediatamente antes) — usado só para o indicador
+  // de variação dos KPIs; se o filtro de datas estiver inválido, fica vazio.
+  const deAtual = getDataCustom('compDe');
+  const ateAtual = getDataCustom('compAte');
+  let lotesAnteriores = [];
+  if (deAtual <= ateAtual) {
+    const anterior = periodoAnterior(deAtual, ateAtual);
+    lotesAnteriores = filtrarLotesPorIntervalo(anterior.de, anterior.ate);
+  }
+
   // Nenhum lote bate com os filtros (concentração/período) — mostra aviso claro em vez
   // de gráficos vazios sem explicação, e para por aqui.
   if (!lotesFiltrados.length) {
     COMPARATIVO_CACHE = { itens: [] };
     ['sumProd','sumPlan','sumDesc','sumPct'].forEach(id => {
       const el = document.getElementById(id); if (el) el.textContent = '—';
+    });
+    ['sumProdDelta','sumPlanDelta','sumDescDelta','sumPctDelta'].forEach(id => {
+      const el = document.getElementById(id); if (el) { el.textContent = ''; el.className = 'kpi-delta'; }
     });
     const tbody = document.getElementById('compTable');
     if (tbody) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text3);padding:24px">Nenhum lote encontrado para os filtros selecionados.</td></tr>';
@@ -1820,6 +1890,17 @@ function buildComparativo() {
   document.getElementById('sumPlan').textContent = fNum(totalPlan);
   document.getElementById('sumDesc').textContent = totalDesc;
   document.getElementById('sumPct').textContent = totalPlan ? fPct3(totalDesc/totalPlan*100) : '—';
+
+  // Indicador de variação vs. período anterior (mesma duração, imediatamente antes)
+  const prevProd = lotesAnteriores.reduce((a,l)=>a+l.prod,0);
+  const prevPlan = lotesAnteriores.reduce((a,l)=>a+l.plan,0);
+  const prevDesc = lotesAnteriores.reduce((a,l)=>a+l.desc,0);
+  const prevPct = prevPlan ? (prevDesc/prevPlan*100) : null;
+  const temAnterior = lotesAnteriores.length > 0;
+  renderKpiDelta('sumProdDelta', totalProd, temAnterior ? prevProd : null, 'alta');
+  renderKpiDelta('sumPlanDelta', totalPlan, temAnterior ? prevPlan : null, 'alta');
+  renderKpiDelta('sumDescDelta', totalDesc, temAnterior ? prevDesc : null, 'baixa');
+  renderKpiDelta('sumPctDelta', totalPlan ? (totalDesc/totalPlan*100) : null, temAnterior ? prevPct : null, 'baixa');
 
   // ─── GRÁFICO: Progresso Acumulado Anual ───────────────────────────
   // Distribui a meta de 43 lotes ao longo de 52 semanas úteis (jan–dez/26)
