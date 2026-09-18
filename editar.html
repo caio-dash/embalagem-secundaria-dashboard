@@ -942,8 +942,8 @@ select.cell option { background: var(--bg3); color: var(--text); }
     </div>
     <div style="overflow-x:auto">
       <table class="data-table" id="kitLotesTable">
-        <thead><tr><th>Lote</th><th>Período</th><th>Mês</th><th>Trim.</th><th>Dias</th><th>Planejado</th><th>Produzido</th><th>PNP</th><th>Desv. Abertos</th></tr></thead>
-        <tbody id="kitLotesTableBody"><tr><td colspan="9" style="text-align:center;color:var(--text3);padding:24px">Nenhum lote de Kit Médico cadastrado ainda. Adicione um na aba "Editar Dados".</td></tr></tbody>
+        <thead><tr><th>Lote</th><th style="min-width:200px">📝 Observações</th><th>Período</th><th>Mês</th><th>Trim.</th><th>Dias</th><th>Planejado</th><th>Produzido</th><th>PNP</th><th>Desv. Abertos</th></tr></thead>
+        <tbody id="kitLotesTableBody"><tr><td colspan="10" style="text-align:center;color:var(--text3);padding:24px">Nenhum lote de Kit Médico cadastrado ainda. Adicione um na aba "Editar Dados".</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -3524,38 +3524,52 @@ function exportarKitLotesCSV() {
 // do produto principal (LOTES): nenhuma função ou dataset é compartilhado entre eles.
 function buildKitCharts() {
   const ids = KIT_LOTES.map(l => l.id || '—');
+  const planData = KIT_LOTES.map(l => l.plan ?? null);
+  const prodData = KIT_LOTES.map(l => l.prod ?? null);
+  const pnpData = KIT_LOTES.map(l => l.pnp !== null && l.pnp !== undefined ? +l.pnp.toFixed(2) : null);
+  const desvAbData = KIT_LOTES.map(l => l.desvAb ?? 0);
 
   setChart('kit_vol', 'chartKitVol', {
     type: 'bar',
     data: { labels: ids, datasets: [
-      { label: 'Planejado', data: KIT_LOTES.map(l => l.plan ?? null), backgroundColor: 'rgba(79,142,247,0.3)', borderColor: clr.line1, borderWidth: 1.5 },
-      { label: 'Produzido', data: KIT_LOTES.map(l => l.prod ?? null), backgroundColor: 'rgba(34,212,150,0.3)', borderColor: clr.green, borderWidth: 1.5 }
+      { label: 'Planejado', data: planData, backgroundColor: 'rgba(79,142,247,0.3)', borderColor: clr.line1, borderWidth: 1.5, order: 4 },
+      { label: 'Produzido', data: prodData, backgroundColor: 'rgba(34,212,150,0.3)', borderColor: clr.green, borderWidth: 1.5, order: 3 },
+      { type:'line', label:'Tendência (Produzido)', data: calcularTendencia(prodData), borderColor: clr.purple, backgroundColor:'transparent', borderWidth:2.25, pointRadius:0, tension:0.35, fill:false, order:1, trendSummary:{unit:' un.',decimals:0} },
+      { type:'line', label:'Média (Produzido)', data: calcularMedia(prodData), borderColor: clr.line3, backgroundColor:'transparent', borderWidth:1.5, borderDash:[2,2], pointRadius:0, tension:0, fill:false, order:2, trendSummary:{unit:' un.',decimals:0,mode:'value',label:'Média'} }
     ]},
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:14,padding:8,font:{size:10}}}}, scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid},ticks:{callback:v=>fNum(v)}}} }
   });
 
   setChart('kit_pnp', 'chartKitPNP', {
     type: 'bar',
-    data: { labels: ids, datasets: [{
-      label: 'PNP (h)',
-      data: KIT_LOTES.map(l => l.pnp !== null && l.pnp !== undefined ? +l.pnp.toFixed(2) : null),
-      backgroundColor: KIT_LOTES.map(l => (l.pnp||0) > 6 ? 'rgba(240,64,96,0.5)' : (l.pnp||0) > 4 ? 'rgba(245,166,35,0.5)' : 'rgba(79,142,247,0.35)'),
-      borderColor: KIT_LOTES.map(l => (l.pnp||0) > 6 ? clr.red : (l.pnp||0) > 4 ? clr.amber : clr.line1),
-      borderWidth: 1.5
-    }]},
-    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid}}} }
+    data: { labels: ids, datasets: [
+      {
+        label: 'PNP (h)',
+        data: pnpData,
+        backgroundColor: KIT_LOTES.map(l => (l.pnp||0) > 6 ? 'rgba(240,64,96,0.5)' : (l.pnp||0) > 4 ? 'rgba(245,166,35,0.5)' : 'rgba(79,142,247,0.35)'),
+        borderColor: KIT_LOTES.map(l => (l.pnp||0) > 6 ? clr.red : (l.pnp||0) > 4 ? clr.amber : clr.line1),
+        borderWidth: 1.5, order: 3
+      },
+      { type:'line', label:'Tendência', data: calcularTendencia(pnpData), borderColor: clr.purple, backgroundColor:'transparent', borderWidth:2.25, pointRadius:0, tension:0.35, fill:false, order:1, trendSummary:{unit:'h',decimals:1} },
+      { type:'line', label:'Média', data: calcularMedia(pnpData), borderColor: clr.line3, backgroundColor:'transparent', borderWidth:1.5, borderDash:[2,2], pointRadius:0, tension:0, fill:false, order:2, trendSummary:{unit:'h',decimals:1,mode:'value',label:'Média'} }
+    ]},
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:14,padding:8,font:{size:10}}}}, scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid}}} }
   });
 
   setChart('kit_desvab', 'chartKitDesvAb', {
     type: 'bar',
-    data: { labels: ids, datasets: [{
-      label: 'Desvios Abertos',
-      data: KIT_LOTES.map(l => l.desvAb ?? 0),
-      backgroundColor: 'rgba(155,107,255,0.35)',
-      borderColor: clr.purple,
-      borderWidth: 1.5
-    }]},
-    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid}}} }
+    data: { labels: ids, datasets: [
+      {
+        label: 'Desvios Abertos',
+        data: desvAbData,
+        backgroundColor: 'rgba(155,107,255,0.35)',
+        borderColor: clr.purple,
+        borderWidth: 1.5, order: 3
+      },
+      { type:'line', label:'Tendência', data: calcularTendencia(desvAbData), borderColor: clr.teal, backgroundColor:'transparent', borderWidth:2.25, pointRadius:0, tension:0.35, fill:false, order:1, trendSummary:{unit:'',decimals:1} },
+      { type:'line', label:'Média', data: calcularMedia(desvAbData), borderColor: clr.line3, backgroundColor:'transparent', borderWidth:1.5, borderDash:[2,2], pointRadius:0, tension:0, fill:false, order:2, trendSummary:{unit:'',decimals:1,mode:'value',label:'Média'} }
+    ]},
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:14,padding:8,font:{size:10}}}}, scales:{x:{grid:{color:clr.grid}},y:{grid:{color:clr.grid},ticks:{stepSize:1}}} }
   });
 
   // Gráficos de descarte por insumo — mesmo padrão visual da aba "Descarte de Insumos"
@@ -3616,11 +3630,12 @@ function buildKitCharts() {
   const tbody = document.getElementById('kitLotesTableBody');
   if (tbody) {
     if (!KIT_LOTES.length) {
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:24px">Nenhum lote de Kit Médico cadastrado ainda. Adicione um na aba "Editar Dados".</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:24px">Nenhum lote de Kit Médico cadastrado ainda. Adicione um na aba "Editar Dados".</td></tr>';
     } else {
       tbody.innerHTML = KIT_LOTES.map(l => `
         <tr>
           <td><strong>${l.id || '—'}</strong></td>
+          <td style="color:${l.obs ? 'var(--text)' : 'var(--text3)'};font-style:${l.obs ? 'normal' : 'italic'}">${l.obs ? l.obs.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '—'}</td>
           <td style="color:var(--text2)">${l.per || '—'}</td>
           <td style="color:var(--text2)">${l.mes || '—'}</td>
           <td style="color:var(--text2)">${l.q || '—'}</td>
