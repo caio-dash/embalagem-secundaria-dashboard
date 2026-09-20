@@ -549,7 +549,7 @@ select.cell option { background: var(--bg3); color: var(--text); }
     <table class="data-table">
       <thead><tr>
         <th>Lote</th><th>Período</th><th id="compColDias">Dias</th><th>Planejado</th><th>Produzido</th>
-        <th>Descarte</th><th>% Descarte</th><th>T.Est E4</th><th>T.Real E4adj</th><th>PNP</th><th>OEE (Rot.1)</th>
+        <th>Descarte</th><th>% Descarte</th><th style="text-align:center">Tendência</th><th>T.Est E4</th><th>T.Real E4adj</th><th>PNP</th><th>OEE (Rot.1)</th>
       </tr></thead>
       <tbody id="compTable"><tr>
       <td><strong>D001</strong></td>
@@ -2290,6 +2290,34 @@ function exportarComparativoCSV(chave) {
   if (typeof showToast === 'function') showToast('💾 CSV exportado');
 }
 
+// Gera um mini-gráfico (sparkline) inline em SVG a partir de uma janela de valores —
+// usado na tabela do Comparativo para dar uma noção visual rápida da tendência recente
+// de cada linha, sem precisar abrir o gráfico grande.
+function gerarSparklineSVG(valores, corPonto) {
+  const w = 64, h = 22, pad = 3;
+  const vals = valores.filter(v => v !== null && v !== undefined && !isNaN(v));
+  if (vals.length < 2) return '<span style="color:var(--text3);font-size:10px">—</span>';
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = (max - min) || 1;
+  const n = valores.length;
+  const pontos = valores.map((v, i) => {
+    const x = pad + (n === 1 ? 0 : (i / (n - 1)) * (w - 2 * pad));
+    const y = (v === null || v === undefined || isNaN(v)) ? null : h - pad - ((v - min) / range) * (h - 2 * pad);
+    return { x, y };
+  });
+  const segmentos = [];
+  let atual = [];
+  pontos.forEach(p => {
+    if (p.y === null) { if (atual.length > 1) segmentos.push(atual); atual = []; }
+    else atual.push(p);
+  });
+  if (atual.length > 1) segmentos.push(atual);
+  const linhas = segmentos.map(seg => `<polyline points="${seg.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}" fill="none" stroke="#9b6bff" stroke-width="1.5"/>`).join('');
+  const ultimoValido = [...pontos].reverse().find(p => p.y !== null);
+  const dot = ultimoValido ? `<circle cx="${ultimoValido.x.toFixed(1)}" cy="${ultimoValido.y.toFixed(1)}" r="2.2" fill="${corPonto}"/>` : '';
+  return `<svg width="${w}" height="${h}" style="display:block;overflow:visible">${linhas}${dot}</svg>`;
+}
+
 function buildComparativo() {
   const META_LOTES_ANO = 40;
 
@@ -2316,7 +2344,7 @@ function buildComparativo() {
       const el = document.getElementById(id); if (el) { el.textContent = ''; el.className = 'kpi-delta'; }
     });
     const tbody = document.getElementById('compTable');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text3);padding:24px">Nenhum lote encontrado para os filtros selecionados.</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--text3);padding:24px">Nenhum lote encontrado para os filtros selecionados.</td></tr>';
     ['compVol','compDesc','compTempo','compPNP','compDesvAb','progressoAnual'].forEach(key => {
       if (CHARTS[key]) { CHARTS[key].destroy(); delete CHARTS[key]; }
     });
@@ -2589,8 +2617,10 @@ function buildComparativo() {
   // Tabela
   const tbody = document.getElementById('compTable');
   tbody.innerHTML = '';
-  itens.forEach(x => {
+  itens.forEach((x, idx) => {
     const tr = document.createElement('tr');
+    const janela = itens.slice(Math.max(0, idx - 5), idx + 1).map(i => i.descPct);
+    const corPonto = x.descPct < 0.05 ? '#22d496' : x.descPct < 1 ? '#4f8ef7' : '#f5a623';
     tr.innerHTML = `
       <td><strong>${x.label}</strong>${x.obs ? ` <span title="${x.obs.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}" style="cursor:help">📝</span>` : ''}</td>
       <td style="color:var(--text2)">${x.perTxt}</td>
@@ -2599,6 +2629,7 @@ function buildComparativo() {
       <td style="text-align:right">${fNum(x.prod)}</td>
       <td style="text-align:right">${x.desc}</td>
       <td style="text-align:right"><span class="badge ${x.descPct<0.05?'green':x.descPct<1?'blue':'amber'}">${fPct3(x.descPct)}</span></td>
+      <td style="text-align:center" title="Tendência do % Descarte nos últimos ${janela.length} pontos, terminando aqui">${gerarSparklineSVG(janela, corPonto)}</td>
       <td style="text-align:center">${fH(x.tEstE4)}</td>
       <td style="text-align:center"><span class="badge ${x.tRealE4a<=x.tEstE4?'green':'amber'}">${fH(x.tRealE4a)}</span></td>
       <td style="text-align:center">${x.pnp!==null ? fH(x.pnp) : '<span style="color:var(--text3)">N/D</span>'}</td>
