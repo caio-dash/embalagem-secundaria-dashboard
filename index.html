@@ -500,7 +500,7 @@ select.cell option { background: var(--bg3); color: var(--text); }
     <table class="data-table">
       <thead><tr>
         <th>Lote</th><th>Período</th><th id="compColDias">Dias</th><th>Planejado</th><th>Produzido</th>
-        <th>Descarte</th><th>% Descarte</th><th style="text-align:center">Tendência</th><th>T.Est E4</th><th>T.Real E4adj</th><th>PNP</th><th>OEE (Rot.1)</th>
+        <th>Descarte</th><th>% Descarte</th><th style="text-align:center">Tendência</th><th>T.Est E4</th><th>T.Real E4adj</th><th>PNP</th><th>OEE Médio</th>
       </tr></thead>
       <tbody id="compTable"><tr>
       <td><strong>D001</strong></td>
@@ -1790,6 +1790,14 @@ function gerarSparklineSVG(valores, corPonto) {
   return `<svg width="${w}" height="${h}" style="display:block;overflow:visible">${linhas}${dot}</svg>`;
 }
 
+// Calcula o OEE médio de um lote entre os 5 equipamentos (Rotuladora 1/2, Esteira, BLA, Unitizadora)
+function oeeMedioLote(oee) {
+  if (!oee) return null;
+  const vals = [oee.rot1, oee.rot2, oee.esteira, oee.bla, oee.unit].filter(v => v !== null && v !== undefined);
+  if (!vals.length) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
 // Agrupa os lotes filtrados em mês/trimestre/semestre, somando volumes e fazendo média
 // dos indicadores de tempo/OEE — usado pelo Comparativo quando a granularidade não é "lote".
 function agregarLotesComparativo(lotesFiltrados) {
@@ -1815,7 +1823,8 @@ function agregarLotesComparativo(lotesFiltrados) {
     grp.tEstE4Soma += l.tEstE4;
     grp.tRealE4aSoma += l.tRealE4a;
     if (l.pnp !== null && l.pnp !== undefined) { grp.pnpSoma += l.pnp; grp.pnpN++; }
-    if (l.oee && l.oee.rot1 !== null && l.oee.rot1 !== undefined) { grp.oeeSoma += l.oee.rot1; grp.oeeN++; }
+    const oeeM = oeeMedioLote(l.oee);
+    if (oeeM !== null) { grp.oeeSoma += oeeM; grp.oeeN++; }
   });
   return Object.values(grupos).sort((a, b) => a.order - b.order).map(g => ({
     label: g.label,
@@ -1825,7 +1834,7 @@ function agregarLotesComparativo(lotesFiltrados) {
     tEstE4: g.nLotes ? g.tEstE4Soma / g.nLotes : 0,
     tRealE4a: g.nLotes ? g.tRealE4aSoma / g.nLotes : 0,
     pnp: g.pnpN ? g.pnpSoma / g.pnpN : null,
-    oeeRot1: g.oeeN ? g.oeeSoma / g.oeeN : null
+    oeeMedio: g.oeeN ? g.oeeSoma / g.oeeN : null
   }));
 }
 
@@ -1878,7 +1887,7 @@ function buildComparativo() {
       descPct: l.plan ? l.desc/l.plan*100 : 0,
       tEstE4: l.tEstE4, tRealE4a: l.tRealE4a,
       pnp: (l.pnp !== null && l.pnp !== undefined) ? l.pnp : null,
-      oeeRot1: (l.oee && l.oee.rot1 !== null && l.oee.rot1 !== undefined) ? l.oee.rot1 : null,
+      oeeMedio: oeeMedioLote(l.oee),
       obs: l.obs || ''
     }));
   } else {
@@ -1889,7 +1898,7 @@ function buildComparativo() {
       diasTxt: String(g.nLotes),
       nLotes: g.nLotes,
       plan: g.plan, prod: g.prod, desc: g.desc, desvAb: g.desvAb, descPct: g.descPct,
-      tEstE4: g.tEstE4, tRealE4a: g.tRealE4a, pnp: g.pnp, oeeRot1: g.oeeRot1,
+      tEstE4: g.tEstE4, tRealE4a: g.tRealE4a, pnp: g.pnp, oeeMedio: g.oeeMedio,
       obs: ''
     }));
   }
@@ -2143,7 +2152,7 @@ function buildComparativo() {
       <td style="text-align:center">${fH(x.tEstE4)}</td>
       <td style="text-align:center"><span class="badge ${x.tRealE4a<=x.tEstE4?'green':'amber'}">${fH(x.tRealE4a)}</span></td>
       <td style="text-align:center">${x.pnp!==null ? fH(x.pnp) : '<span style="color:var(--text3)">N/D</span>'}</td>
-      <td style="text-align:center">${x.oeeRot1!==null ? `<span class="badge ${x.oeeRot1>=0.85?'green':x.oeeRot1>=0.6?'amber':'red'}">${fPct(x.oeeRot1*100)}</span>` : '<span style="color:var(--text3)">N/D</span>'}</td>`;
+      <td style="text-align:center">${x.oeeMedio!==null ? `<span class="badge ${x.oeeMedio>=0.85?'green':x.oeeMedio>=0.70?'blue':x.oeeMedio>=0.60?'amber':'red'}">${fPct(x.oeeMedio*100)}</span>` : '<span style="color:var(--text3)">N/D</span>'}</td>`;
     tbody.appendChild(tr);
   });
 }
