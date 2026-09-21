@@ -1873,7 +1873,10 @@ function agregarGrupo(nome, ls, chaveExtra) {
   const tRealMedio = ls.length ? ls.reduce((a,l)=>a+l.tRealE4a,0)/ls.length : 0;
   const tEstMedio = ls.length ? ls.reduce((a,l)=>a+l.tEstE4,0)/ls.length : 0;
   const oeeLs = ls.filter(l=>l.oee);
-  const oeeMedia = oeeLs.length ? oeeLs.reduce((a,l)=>a+l.oee.rot1,0)/oeeLs.length : null;
+  // OEE médio do grupo = média do OEE médio de cada lote (mesmos 5 equipamentos usados
+  // na tabela "Comparativo entre Lotes" — antes este campo só considerava a Rotuladora 1).
+  const oeeMediosPorLote = oeeLs.map(l => oeeMedioLote(l.oee)).filter(v => v !== null);
+  const oeeMedia = oeeMediosPorLote.length ? oeeMediosPorLote.reduce((a,b)=>a+b,0)/oeeMediosPorLote.length : null;
   const oeeEst = oeeLs.length ? oeeLs.reduce((a,l)=>a+l.oee.esteira,0)/oeeLs.length : null;
   const oeeBla = oeeLs.length ? oeeLs.reduce((a,l)=>a+l.oee.bla,0)/oeeLs.length : null;
   return { nome, chave: chaveExtra ?? nome, lotes: ls, plan, prod, desc, tRealMedio, tEstMedio, oeeMedia, oeeEst, oeeBla, nLotes: ls.length };
@@ -2854,7 +2857,7 @@ function buildVisaoPeriodo() {
       <td style="text-align:right">${g.desc}</td>
       <td style="text-align:right"><span class="badge ${descPct<0.05?'green':'amber'}">${fPct3(descPct)}</span></td>
       <td style="text-align:center">${fH(g.tRealMedio)}</td>
-      <td style="text-align:center">${g.oeeMedia!==null && g.oeeMedia!==undefined ? `<span class="badge ${g.oeeMedia>=0.85?'green':g.oeeMedia>=0.6?'amber':'red'}">${fPct(g.oeeMedia*100)}</span>` : '<span style="color:var(--text3)">N/D</span>'}`;
+      <td style="text-align:center">${g.oeeMedia!==null && g.oeeMedia!==undefined ? `<span class="badge ${g.oeeMedia>=0.85?'green':g.oeeMedia>=0.70?'blue':g.oeeMedia>=0.60?'amber':'red'}">${fPct(g.oeeMedia*100)}</span>` : '<span style="color:var(--text3)">N/D</span>'}`;
     tbody.appendChild(tr);
   });
 }
