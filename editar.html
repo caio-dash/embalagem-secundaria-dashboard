@@ -3172,9 +3172,19 @@ function addSheetRow() {
   document.getElementById('sec-planilha').scrollIntoView({behavior:'smooth', block:'end'});
 }
 
+// IDs de lotes removidos na tela (via botão ✕) que ainda precisam ser excluídos
+// do Supabase no próximo "Atualizar Dashboard" — ver salvarLotesSupabase().
+let idsLotesParaExcluir = [];
+
 function removerLinhaLote(btn) {
   const trPrincipal = btn.closest('tr');
   if (!trPrincipal) return;
+
+  // Guarda o ID do lote para excluir de fato no Supabase ao salvar
+  const idInput = trPrincipal.querySelector('.f-id');
+  const idLote = idInput ? idInput.value.trim() : '';
+  if (idLote) idsLotesParaExcluir.push(idLote);
+
   // Remove todas as sub-linhas associadas (ins-row e dias-row) antes da próxima linha principal
   let next = trPrincipal.nextElementSibling;
   while (next && (next.classList.contains('ins-row') || next.classList.contains('dias-row'))) {
@@ -3183,6 +3193,10 @@ function removerLinhaLote(btn) {
     toRemove.remove();
   }
   trPrincipal.remove();
+
+  if (typeof showToast === 'function') {
+    showToast('Lote removido da tela — clique em "↻ Atualizar Dashboard" para salvar');
+  }
 }
 
 function applyChanges() {
@@ -3424,9 +3438,17 @@ function addKitSheetRow() {
   tr.scrollIntoView({behavior:'smooth', block:'center'});
 }
 
+// Mesma lógica de idsLotesParaExcluir usada na linha principal (ver removerLinhaLote)
+let idsKitLotesParaExcluir = [];
+
 function removerLinhaKit(btn) {
   const trPrincipal = btn.closest('tr');
   if (!trPrincipal) return;
+
+  const idInput = trPrincipal.querySelector('.f-id');
+  const idLote = idInput ? idInput.value.trim() : '';
+  if (idLote) idsKitLotesParaExcluir.push(idLote);
+
   let next = trPrincipal.nextElementSibling;
   while (next && (next.classList.contains('ins-row') || next.classList.contains('dias-row'))) {
     const toRemove = next;
@@ -3434,6 +3456,10 @@ function removerLinhaKit(btn) {
     toRemove.remove();
   }
   trPrincipal.remove();
+
+  if (typeof showToast === 'function') {
+    showToast('Lote removido da tela — clique em "Atualizar" para salvar');
+  }
 }
 
 function applyKitChanges() {
@@ -3536,9 +3562,23 @@ async function salvarKitLotesSupabase() {
   if (error) {
     setKitSyncStatus('⚠ erro ao salvar', '#ef4444');
     console.error('Erro ao salvar Kit Médico:', error);
-  } else {
-    setKitSyncStatus('✓ salvo · ' + new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }), 'var(--green2)');
+    return;
   }
+
+  // Exclui de fato, no Supabase, os lotes do Kit removidos na tela (botão ✕)
+  const idsAtuais = new Set(KIT_LOTES.map(l => l.id).filter(Boolean));
+  const idsParaExcluirAgora = [...new Set(idsKitLotesParaExcluir)].filter(id => !idsAtuais.has(id));
+  if (idsParaExcluirAgora.length) {
+    const { error: errDel } = await sb.from('kit_medico_lotes').delete().in('id', idsParaExcluirAgora);
+    if (errDel) {
+      console.error('Erro ao excluir Kit Médico:', errDel);
+      setKitSyncStatus('⚠ erro ao excluir lote(s)', '#ef4444');
+      return;
+    }
+    idsKitLotesParaExcluir = [];
+  }
+
+  setKitSyncStatus('✓ salvo · ' + new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }), 'var(--green2)');
 }
 
 // Exporta a tabela de lotes do Kit Médico em CSV
@@ -4746,9 +4786,25 @@ async function salvarLotesSupabase(silencioso) {
   if (error) {
     setSyncStatus('⚠ erro ao salvar', '#ef4444');
     console.error('Supabase save error:', error);
-  } else {
-    setSyncStatus('✓ salvo na nuvem · ' + new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }), 'var(--green2)');
+    return;
   }
+
+  // Exclui de fato, no Supabase, os lotes removidos na tela (botão ✕).
+  // Sem isso, o upsert acima nunca apaga uma linha que sumiu do LOTES —
+  // ele só insere/atualiza — e o lote "excluído" reaparece ao recarregar.
+  const idsAtuais = new Set(LOTES.map(l => l.id).filter(Boolean));
+  const idsParaExcluirAgora = [...new Set(idsLotesParaExcluir)].filter(id => !idsAtuais.has(id));
+  if (idsParaExcluirAgora.length) {
+    const { error: errDel } = await sb.from('lotes').delete().in('id', idsParaExcluirAgora);
+    if (errDel) {
+      console.error('Supabase delete error:', errDel);
+      setSyncStatus('⚠ erro ao excluir lote(s)', '#ef4444');
+      return; // mantém os IDs na lista para tentar excluir na próxima vez
+    }
+    idsLotesParaExcluir = [];
+  }
+
+  setSyncStatus('✓ salvo na nuvem · ' + new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }), 'var(--green2)');
 }
 
 // Registra no Supabase quais lotes foram alterados nesta sessão — a política de segurança
