@@ -3180,9 +3180,17 @@ function removerLinhaLote(btn) {
   const trPrincipal = btn.closest('tr');
   if (!trPrincipal) return;
 
-  // Guarda o ID do lote para excluir de fato no Supabase ao salvar
   const idInput = trPrincipal.querySelector('.f-id');
   const idLote = idInput ? idInput.value.trim() : '';
+
+  const confirmado = confirm(
+    idLote
+      ? `Excluir o lote "${idLote}"?\n\nEsta ação não pode ser desfeita depois de clicar em "↻ Atualizar Dashboard".`
+      : 'Excluir esta linha (sem ID preenchido)?\n\nEsta ação não pode ser desfeita depois de clicar em "↻ Atualizar Dashboard".'
+  );
+  if (!confirmado) return;
+
+  // Guarda o ID do lote para excluir de fato no Supabase ao salvar
   if (idLote) idsLotesParaExcluir.push(idLote);
 
   // Remove todas as sub-linhas associadas (ins-row e dias-row) antes da próxima linha principal
@@ -3281,6 +3289,22 @@ function applyChanges() {
     novosLotes.push({ id, per, mes, q, dias, plan, prod, desc, tEstE4, tRealE4a, pnp, oee, desvAb, desvAtras, diarios,
       conc, op, insumos: hasInsumos ? insumos : null, obs: obs || undefined });
   });
+
+  // Validação: impede salvar se houver IDs de lote duplicados na tabela —
+  // um upsert no Supabase sobrescreveria silenciosamente um dos dois lotes.
+  const idsVistos = new Set();
+  const idsDuplicados = new Set();
+  novosLotes.forEach(l => {
+    if (!l.id) return;
+    if (idsVistos.has(l.id)) idsDuplicados.add(l.id);
+    idsVistos.add(l.id);
+  });
+  if (idsDuplicados.size) {
+    alert('Não é possível atualizar: existe ID de lote duplicado na tabela:\n\n' +
+      [...idsDuplicados].join(', ') +
+      '\n\nCorrija o(s) ID(s) repetido(s) e clique em "↻ Atualizar Dashboard" novamente.');
+    return;
+  }
 
   // Detecta quais lotes são novos ou tiveram algum campo alterado, para o registro
   // de auditoria (aplicado só quando o usuário logado é o e-mail autorizado — ver registrarAuditoria)
@@ -3447,6 +3471,14 @@ function removerLinhaKit(btn) {
 
   const idInput = trPrincipal.querySelector('.f-id');
   const idLote = idInput ? idInput.value.trim() : '';
+
+  const confirmado = confirm(
+    idLote
+      ? `Excluir o lote "${idLote}" do Kit Médico?\n\nEsta ação não pode ser desfeita depois de clicar em "Atualizar".`
+      : 'Excluir esta linha (sem ID preenchido) do Kit Médico?\n\nEsta ação não pode ser desfeita depois de clicar em "Atualizar".'
+  );
+  if (!confirmado) return;
+
   if (idLote) idsKitLotesParaExcluir.push(idLote);
 
   let next = trPrincipal.nextElementSibling;
@@ -3515,6 +3547,21 @@ function applyKitChanges() {
 
     novosLotes.push({ id, per, mes, q, dias, plan, prod, pnp, desvAb, diarios, insumos: hasInsumos ? insumos : null, obs: obs || undefined });
   });
+
+  // Validação: impede salvar se houver IDs de lote duplicados na tabela
+  const idsVistosKit = new Set();
+  const idsDuplicadosKit = new Set();
+  novosLotes.forEach(l => {
+    if (!l.id) return;
+    if (idsVistosKit.has(l.id)) idsDuplicadosKit.add(l.id);
+    idsVistosKit.add(l.id);
+  });
+  if (idsDuplicadosKit.size) {
+    alert('Não é possível atualizar: existe ID de lote duplicado na tabela do Kit Médico:\n\n' +
+      [...idsDuplicadosKit].join(', ') +
+      '\n\nCorrija o(s) ID(s) repetido(s) e clique em "Atualizar" novamente.');
+    return;
+  }
 
   KIT_LOTES = novosLotes;
   sortKitLotesCronologico();
