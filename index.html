@@ -251,9 +251,54 @@ select.cell option { background: var(--bg3); color: var(--text); }
 #syncStatus { color:var(--text3);font-size:11px; }
 #btnLogout { background:none;border:1px solid var(--border2);border-radius:6px;padding:4px 10px;color:var(--text2);cursor:pointer;font-size:11px; }
 #btnLogout:hover { color:#ef4444;border-color:#ef4444; }
+/* ─── SKELETON LOADING ─── mostrado por padrão, escondido quando os dados chegam */
+#skeletonOverlay {
+  position: fixed; inset: 0; z-index: 99997;
+  background: var(--bg);
+  display: flex; flex-direction: column; gap: 22px;
+  padding: 20px 32px 32px;
+  box-sizing: border-box;
+  transition: opacity .35s ease;
+}
+#skeletonOverlay.skel-escondido { opacity: 0; pointer-events: none; }
+.skel-bloco {
+  background: linear-gradient(90deg, var(--card) 25%, var(--border2) 37%, var(--card) 63%);
+  background-size: 400% 100%;
+  animation: skel-shimmer 1.5s ease infinite;
+  border-radius: 10px;
+}
+@keyframes skel-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+.skel-nav { height: 48px; border-radius: 10px; }
+.skel-tabs { height: 34px; width: 60%; max-width: 520px; border-radius: 8px; }
+.skel-titulo { height: 22px; width: 220px; border-radius: 6px; }
+.skel-linha-kpi { display: flex; gap: 14px; flex-wrap: wrap; }
+.skel-kpi { height: 72px; flex: 1; min-width: 140px; }
+.skel-linha-charts { display: flex; gap: 16px; flex-wrap: wrap; flex: 1; min-height: 0; }
+.skel-chart { flex: 1; min-width: 280px; border-radius: 12px; }
+@media (max-width: 900px) {
+  .skel-linha-charts { flex-direction: column; }
+}
 </style>
 </head>
 <body>
+
+<!-- ── SKELETON LOADING ── visível por padrão; some assim que os dados chegam ── -->
+<div id="skeletonOverlay">
+  <div class="skel-bloco skel-nav"></div>
+  <div class="skel-bloco skel-tabs"></div>
+  <div class="skel-bloco skel-titulo"></div>
+  <div class="skel-linha-kpi">
+    <div class="skel-bloco skel-kpi"></div>
+    <div class="skel-bloco skel-kpi"></div>
+    <div class="skel-bloco skel-kpi"></div>
+    <div class="skel-bloco skel-kpi"></div>
+  </div>
+  <div class="skel-linha-charts">
+    <div class="skel-bloco skel-chart"></div>
+    <div class="skel-bloco skel-chart"></div>
+  </div>
+</div>
+
 
 <!-- ── OVERLAY DE LOGIN ───────────────────────────────── -->
 
@@ -3448,8 +3493,19 @@ async function carregarLotes() {
   }
   sortLotesCronologico();
   initDashboard();
+  esconderSkeletonLoading();
   carregarKitLotesSupabase(); // carrega os dados do Kit Médico em paralelo — fonte de dados independente do produto principal
 }
+
+function esconderSkeletonLoading() {
+  const el = document.getElementById('skeletonOverlay');
+  if (!el) return;
+  el.classList.add('skel-escondido');
+  setTimeout(() => el.remove(), 400);
+}
+// Salvaguarda: se algo impedir o fluxo normal de chegar até esconderSkeletonLoading(),
+// não deixa a tela travada atrás do skeleton para sempre.
+setTimeout(esconderSkeletonLoading, 8000);
 
 carregarLotes();
 
