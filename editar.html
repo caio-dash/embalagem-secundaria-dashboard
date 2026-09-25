@@ -178,8 +178,55 @@ main { max-width: 1400px; margin: 0 auto; padding: 28px 24px; }
 .cell::placeholder { color: var(--text3); }
 select.cell { -webkit-appearance:none; appearance:none; cursor:pointer; }
 select.cell option { background: var(--bg3); color: var(--text); }
-.row-del { width:100%; height:100%; min-width:32px; background:transparent; border:none; color:var(--red); font-size:14px; cursor:pointer; padding:8px; transition: background .15s; }
+.row-del { min-width:28px; background:transparent; border:none; color:var(--red); font-size:14px; cursor:pointer; padding:6px 8px; border-radius:6px; transition: background .15s; }
 .row-del:hover { background: rgba(240,64,96,0.14); }
+.row-edit { min-width:28px; background:transparent; border:none; color:var(--blue); font-size:13px; cursor:pointer; padding:6px 8px; border-radius:6px; transition: background .15s; margin-right:2px; }
+.row-edit:hover { background: rgba(79,142,247,0.14); }
+
+/* PAINEL DE EDIÇÃO FOCADA (1 lote por vez) */
+.painel-edicao-overlay {
+  position: fixed; inset: 0; z-index: 20000;
+  background: rgba(5,7,14,0.72);
+  display: none; align-items: center; justify-content: center;
+  padding: 24px; box-sizing: border-box;
+}
+.painel-edicao-overlay.painel-visivel { display: flex; }
+.painel-edicao-card {
+  background: var(--card); border: 1px solid var(--border2); border-radius: 16px;
+  width: 100%; max-width: 740px; max-height: 88vh; overflow: auto;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+}
+.painel-edicao-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 18px 22px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--card); z-index: 1;
+}
+.painel-edicao-header h3 { font-size: 15px; font-weight: 700; color: var(--text); margin: 0; }
+.painel-edicao-fechar {
+  background: none; border: none; color: var(--text2); font-size: 15px; cursor: pointer;
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+}
+.painel-edicao-fechar:hover { background: var(--bg3); color: var(--text); }
+.painel-edicao-corpo {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px;
+  padding: 22px;
+}
+.painel-campo { display: flex; flex-direction: column; gap: 6px; }
+.painel-campo-largo { grid-column: 1 / -1; }
+.painel-campo label { font-size: 11px; color: var(--text2); font-weight: 600; letter-spacing: 0.02em; }
+.painel-campo input, .painel-campo select, .painel-campo textarea {
+  font-size: 14px !important; padding: 10px 12px !important;
+  background: var(--bg3) !important; border: 1px solid var(--border2) !important; border-radius: 8px !important;
+  color: var(--text) !important; width: 100%; box-sizing: border-box;
+}
+.painel-edicao-rodape {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  padding: 16px 22px; border-top: 1px solid var(--border);
+  position: sticky; bottom: 0; background: var(--card);
+}
+@media (max-width: 640px) {
+  .painel-edicao-corpo { grid-template-columns: 1fr; }
+}
 
 /* TOAST */
 .toast { position:fixed; bottom:24px; right:24px; background: var(--green2); color:#fff; padding:12px 22px; border-radius:8px; font-size:13px; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,0.35); opacity:0; transform:translateY(12px); transition: all .25s ease; z-index:1000; pointer-events:none; display:flex; align-items:center; gap:8px; }
@@ -268,9 +315,50 @@ select.cell option { background: var(--bg3); color: var(--text); }
 #syncStatus { color:var(--text3);font-size:11px; }
 #btnLogout { background:none;border:1px solid var(--border2);border-radius:6px;padding:4px 10px;color:var(--text2);cursor:pointer;font-size:11px; }
 #btnLogout:hover { color:#ef4444;border-color:#ef4444; }
+
+/* ─── SKELETON LOADING ─── mostrado por padrão, escondido quando login/dados ficam prontos */
+#skeletonOverlay {
+  position: fixed; inset: 0; z-index: 99997;
+  background: var(--bg);
+  display: flex; flex-direction: column; gap: 22px;
+  padding: 20px 32px 32px;
+  box-sizing: border-box;
+  transition: opacity .35s ease;
+}
+#skeletonOverlay.skel-escondido { opacity: 0; pointer-events: none; }
+.skel-bloco {
+  background: linear-gradient(90deg, var(--card) 25%, var(--border2) 37%, var(--card) 63%);
+  background-size: 400% 100%;
+  animation: skel-shimmer 1.5s ease infinite;
+  border-radius: 10px;
+}
+@keyframes skel-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+.skel-nav { height: 48px; border-radius: 10px; }
+.skel-tabs { height: 34px; width: 60%; max-width: 520px; border-radius: 8px; }
+.skel-titulo { height: 22px; width: 220px; border-radius: 6px; }
+.skel-linha-kpi { display: flex; gap: 14px; flex-wrap: wrap; }
+.skel-kpi { height: 72px; flex: 1; min-width: 140px; }
+.skel-tabela { flex: 1; min-height: 0; border-radius: 12px; }
+@media (max-width: 900px) {
+  .skel-linha-kpi { flex-direction: column; }
+}
 </style>
 </head>
 <body>
+
+<!-- ── SKELETON LOADING ── visível por padrão; some assim que o login/dados ficam prontos ── -->
+<div id="skeletonOverlay">
+  <div class="skel-bloco skel-nav"></div>
+  <div class="skel-bloco skel-tabs"></div>
+  <div class="skel-bloco skel-titulo"></div>
+  <div class="skel-linha-kpi">
+    <div class="skel-bloco skel-kpi"></div>
+    <div class="skel-bloco skel-kpi"></div>
+    <div class="skel-bloco skel-kpi"></div>
+    <div class="skel-bloco skel-kpi"></div>
+  </div>
+  <div class="skel-bloco skel-tabela"></div>
+</div>
 
 <!-- ── OVERLAY DE LOGIN ───────────────────────────────── -->
 <div id="authOverlay">
@@ -1444,6 +1532,23 @@ select.cell option { background: var(--bg3); color: var(--text); }
 </div>
 
 <div class="toast" id="toast">✓ Dashboard atualizado com sucesso!</div>
+
+<!-- Painel de edição focada: mostra 1 lote por vez, campos maiores, mais fácil de revisar
+     antes de salvar. Os inputs mostrados aqui são os MESMOS elementos da tabela (movidos
+     temporariamente pra cá) — não há cópia nem sincronização separada de dados. -->
+<div class="painel-edicao-overlay" id="painelEdicaoOverlay" onclick="if(event.target===this) fecharPainelEdicaoLote()">
+  <div class="painel-edicao-card">
+    <div class="painel-edicao-header">
+      <h3 id="painelEdicaoTitulo">Editando lote</h3>
+      <button class="painel-edicao-fechar" onclick="fecharPainelEdicaoLote()" title="Fechar (Esc)">✕</button>
+    </div>
+    <div id="painelEdicaoCorpo" class="painel-edicao-corpo"></div>
+    <div class="painel-edicao-rodape">
+      <span style="color:var(--text3);font-size:11px">Campos de insumos e dados diários continuam editáveis na tabela (▼ Insumos / ▼ Dias).</span>
+      <button class="btn btn-primary" onclick="fecharPainelEdicaoLote()">✓ Concluir edição</button>
+    </div>
+  </div>
+</div>
 </div><!-- /dashboardMain -->
 
 <script type="application/json" id="lotesData">[{"id":"261001B001","per":"13–19/jan","mes":"Jan/26","q":"Q1","conc":"","dias":5,"plan":22148,"prod":22144,"desc":4,"tEstE4":14.73,"tRealE4a":18.2,"pnp":null,"oee":null,"desvAb":0,"desvAtras":0,"diarios":[{"d":"13/jan","est":6000,"real":1547,"desc":4,"tE":0.042,"tR":0.065,"efPrev":21,"ausP":3,"efReal":18},{"d":"14/jan","est":6000,"real":6099,"desc":0,"tE":0.169,"tR":0.368,"efPrev":21,"ausP":3,"efReal":18},{"d":"15/jan","est":6000,"real":6400,"desc":0,"tE":0.178,"tR":0.293,"efPrev":21,"ausP":0,"efReal":20},{"d":"16/jan","est":6000,"real":5815,"desc":0,"tE":0.161,"tR":0.309,"efPrev":21,"ausP":0,"efReal":21},{"d":"19/jan","est":2283,"real":2283,"desc":0,"tE":0.063,"tR":0.126,"efPrev":21,"ausP":2,"efReal":18}]},{"id":"261001C001","per":"20–27/jan","mes":"Jan/26","q":"Q1","conc":"","dias":6,"plan":22070,"prod":22065,"desc":5,"tEstE4":14.72,"tRealE4a":17.4,"pnp":null,"oee":null,"desvAb":0,"desvAtras":0,"diarios":[{"d":"20/jan","est":6000,"real":0,"desc":5,"tE":0,"tR":0,"efPrev":21,"ausP":1,"efReal":20},{"d":"21/jan","est":6000,"real":2869,"desc":0,"tE":0.08,"tR":0.208,"efPrev":21,"ausP":1,"efReal":19},{"d":"22/jan","est":6000,"real":6399,"desc":0,"tE":0.178,"tR":0.311,"efPrev":21,"ausP":0,"efReal":18},{"d":"23/jan","est":6000,"real":4799,"desc":0,"tE":0.133,"tR":0.318,"efPrev":21,"ausP":1,"efReal":18},{"d":"26/jan","est":6000,"real":2799,"desc":0,"tE":0.078,"tR":0.3,"efPrev":21,"ausP":0,"efReal":18},{"d":"27/jan","est":5199,"real":5199,"desc":0,"tE":0.144,"tR":0.276,"efPrev":21,"ausP":2,"efReal":19}]},{"id":"261001D001","per":"06–12/jan","mes":"Jan/26","q":"Q1","conc":"","dias":5,"plan":21880,"prod":21850,"desc":30,"tEstE4":14.58,"tRealE4a":19.92,"pnp":null,"oee":null,"desvAb":0,"desvAtras":0,"diarios":[{"d":"06/jan","est":6000,"real":1478,"desc":30,"tE":0.042,"tR":0.072,"efPrev":21,"ausP":1,"efReal":19},{"d":"07/jan","est":6000,"real":4289,"desc":0,"tE":0.119,"tR":0.302,"efPrev":21,"ausP":1,"efReal":20},{"d":"08/jan","est":6000,"real":7095,"desc":0,"tE":0.197,"tR":0.317,"efPrev":21,"ausP":1,"efReal":19},{"d":"09/jan","est":6000,"real":5791,"desc":0,"tE":0.161,"tR":0.315,"efPrev":21,"ausP":1,"efReal":19},{"d":"12/jan","est":3197,"real":3197,"desc":0,"tE":0.089,"tR":0.266,"efPrev":21,"ausP":1,"efReal":20}]},{"id":"261001A001","per":"09–13/fev","mes":"Fev/26","q":"Q1","conc":"","dias":5,"plan":22148,"prod":22147,"desc":1,"tEstE4":14.77,"tRealE4a":17.8,"pnp":null,"oee":{"rot1":0.69,"rot2":0.69,"esteira":0.83,"bla":0.69,"unit":0.69},"desvAb":0,"desvAtras":0,"diarios":[{"d":"09/fev","est":6000,"real":3554,"desc":1,"tE":0.099,"tR":0.288,"efPrev":21,"ausP":2,"efReal":19},{"d":"10/fev","est":6000,"real":4694,"desc":0,"tE":0.13,"tR":0.212,"efPrev":21,"ausP":2,"efReal":19},{"d":"11/fev","est":6000,"real":7500,"desc":0,"tE":0.208,"tR":0.324,"efPrev":21,"ausP":2,"efReal":19},{"d":"12/fev","est":6000,"real":5663,"desc":0,"tE":0.157,"tR":0.283,"efPrev":21,"ausP":2,"efReal":17},{"d":"13/fev","est":736,"real":736,"desc":0,"tE":0.02,"tR":0.094,"efPrev":21,"ausP":2,"efReal":19}]},{"id":"261001B002","per":"19–24/fev","mes":"Fev/26","q":"Q1","conc":"","dias":4,"plan":21723,"prod":21718,"desc":5,"tEstE4":14.48,"tRealE4a":16.73,"pnp":null,"oee":{"rot1":0.72,"rot2":0.72,"esteira":0.86,"bla":0.72,"unit":0.72},"desvAb":0,"desvAtras":0,"diarios":[{"d":"19/fev","est":6000,"real":1223,"desc":5,"tE":0.034,"tR":0.063,"efPrev":21,"ausP":3,"efReal":18},{"d":"20/fev","est":6000,"real":6197,"desc":0,"tE":0.172,"tR":0.291,"efPrev":21,"ausP":2,"efReal":18},{"d":"23/fev","est":6000,"real":7100,"desc":0,"tE":0.197,"tR":0.303,"efPrev":21,"ausP":1,"efReal":20},{"d":"24/fev","est":6000,"real":7198,"desc":0,"tE":0.2,"tR":0.305,"efPrev":21,"ausP":3,"efReal":18}]},{"id":"261001C002","per":"26/fev–04/mar","mes":"Fev/26","q":"Q1","conc":"","dias":5,"plan":22125,"prod":22120,"desc":5,"tEstE4":14.75,"tRealE4a":23.27,"pnp":null,"oee":{"rot1":0.53,"rot2":0.53,"esteira":0.63,"bla":0.53,"unit":0.53},"desvAb":0,"desvAtras":0,"diarios":[{"d":"26/fev","est":6000,"real":5748,"desc":5,"tE":0.16,"tR":0.299,"efPrev":21,"ausP":1,"efReal":19},{"d":"27/fev","est":6000,"real":4776,"desc":0,"tE":0.133,"tR":0.311,"efPrev":21,"ausP":1,"efReal":18},{"d":"02/mar","est":6000,"real":5196,"desc":0,"tE":0.144,"tR":0.306,"efPrev":21,"ausP":1,"efReal":20},{"d":"03/mar","est":6000,"real":5400,"desc":0,"tE":0.15,"tR":0.302,"efPrev":21,"ausP":1,"efReal":19},{"d":"04/mar","est":1000,"real":1000,"desc":0,"tE":0.028,"tR":0.114,"efPrev":21,"ausP":2,"efReal":17}]},{"id":"261001B003","per":"27/mar–01/abr","mes":"Mar/26","q":"Q1","conc":"","dias":4,"plan":21725,"prod":21722,"desc":3,"tEstE4":14.48,"tRealE4a":24.95,"pnp":3.72,"oee":{"rot1":0.54,"rot2":0.54,"esteira":0.65,"bla":0.54,"unit":0.54},"desvAb":0,"desvAtras":0,"diarios":[{"d":"27/mar","est":6000,"real":6723,"desc":3,"tE":0.187,"tR":0.332,"efPrev":21,"ausP":2,"efReal":18},{"d":"30/mar","est":6000,"real":8199,"desc":0,"tE":0.228,"tR":0.335,"efPrev":21,"ausP":2,"efReal":19},{"d":"31/mar","est":6000,"real":3740,"desc":0,"tE":0.104,"tR":0.353,"efPrev":21,"ausP":1,"efReal":20},{"d":"01/abr","est":3000,"real":3060,"desc":0,"tE":0.085,"tR":0.117,"efPrev":21,"ausP":1,"efReal":20}]},{"id":"261001A002","per":"14–20/abr","mes":"Abr/26","q":"Q2","conc":"250 UI","dias":5,"plan":22042,"prod":22039,"desc":3,"tEstE4":14.7,"tRealE4a":26.35,"pnp":4.08,"oee":{"rot1":0.46,"rot2":0.46,"esteira":0.56,"bla":0.46,"unit":0.46},"desvAb":1,"desvAtras":1,"diarios":[{"d":"14/abr","est":6000,"real":1742,"desc":3,"tE":0.048,"tR":0.072,"efPrev":21,"ausP":1,"efReal":19},{"d":"15/abr","est":6000,"real":6300,"desc":0,"tE":0.175,"tR":0.351,"efPrev":21,"ausP":2,"efReal":18},{"d":"16/abr","est":6000,"real":8499,"desc":0,"tE":0.236,"tR":0.351,"efPrev":21,"ausP":3,"efReal":18},{"d":"17/abr","est":6000,"real":4347,"desc":0,"tE":0.121,"tR":0.351,"efPrev":21,"ausP":1,"efReal":19},{"d":"20/abr","est":1042,"real":1151,"desc":0,"tE":0.032,"tR":0.284,"efPrev":21,"ausP":2,"efReal":18}]},{"id":"261001C003","per":"01–07/abr","mes":"Abr/26","q":"Q2","conc":"","dias":4,"plan":22129,"prod":22126,"desc":3,"tEstE4":14.75,"tRealE4a":22.1,"pnp":4.37,"oee":{"rot1":0.56,"rot2":0.56,"esteira":0.67,"bla":0.56,"unit":0.56},"desvAb":0,"desvAtras":0,"diarios":[{"d":"01/abr","est":6000,"real":3229,"desc":3,"tE":0.09,"tR":0.133,"efPrev":21,"ausP":1,"efReal":20},{"d":"02/abr","est":6000,"real":8700,"desc":0,"tE":0.242,"tR":0.36,"efPrev":21,"ausP":1,"efReal":19},{"d":"04/abr","est":6000,"real":7297,"desc":0,"tE":0.203,"tR":0.357,"efPrev":21,"ausP":3,"efReal":18},{"d":"07/abr","est":3129,"real":2900,"desc":0,"tE":0.081,"tR":0.169,"efPrev":21,"ausP":3,"efReal":11}]},{"id":"261001D002","per":"08–13/abr","mes":"Abr/26","q":"Q2","conc":"","dias":4,"plan":21980,"prod":21978,"desc":2,"tEstE4":14.65,"tRealE4a":22.98,"pnp":4.8,"oee":{"rot1":0.53,"rot2":0.53,"esteira":0.64,"bla":0.53,"unit":0.53},"desvAb":0,"desvAtras":0,"diarios":[{"d":"08/abr","est":6000,"real":4580,"desc":2,"tE":0.127,"tR":0.238,"efPrev":21,"ausP":3,"efReal":17},{"d":"09/abr","est":6000,"real":7700,"desc":0,"tE":0.214,"tR":0.351,"efPrev":21,"ausP":3,"efReal":17},{"d":"10/abr","est":6000,"real":8499,"desc":0,"tE":0.236,"tR":0.353,"efPrev":21,"ausP":3,"efReal":17},{"d":"13/abr","est":1980,"real":1199,"desc":0,"tE":0.033,"tR":0.126,"efPrev":21,"ausP":1,"efReal":19}]},{"id":"261001B004","per":"05–11/mai","mes":"Mai/26","q":"Q2","conc":"500 UI","dias":5,"plan":22023,"prod":22022,"desc":1,"tEstE4":14.68,"tRealE4a":26.13,"pnp":6.73,"oee":{"rot1":0.47,"rot2":0.47,"esteira":0.56,"bla":0.47,"unit":0.47},"desvAb":0,"desvAtras":0,"diarios":[{"d":"05/mai","est":6000,"real":2849,"desc":1,"tE":0.079,"tR":0.267,"efPrev":21,"ausP":2,"efReal":18},{"d":"06/mai","est":6000,"real":4974,"desc":0,"tE":0.138,"tR":0.306,"efPrev":21,"ausP":2,"efReal":19},{"d":"07/mai","est":6000,"real":5400,"desc":0,"tE":0.15,"tR":0.31,"efPrev":21,"ausP":1,"efReal":20},{"d":"08/mai","est":6000,"real":3877,"desc":0,"tE":0.108,"tR":0.309,"efPrev":21,"ausP":2,"efReal":18},{"d":"11/mai","est":6000,"real":4922,"desc":0,"tE":0.137,"tR":0.306,"efPrev":21,"ausP":1,"efReal":19}]},{"id":"261001B005","per":"26–28/mai","mes":"Mai/26","q":"Q2","conc":"500 UI","dias":5,"plan":19802,"prod":19802,"desc":0,"tEstE4":13.2,"tRealE4a":19.27,"pnp":4.57,"oee":{"rot1":0.571,"rot2":0.571,"esteira":0.685,"bla":0.57,"unit":0.57},"desvAb":0,"desvAtras":0,"diarios":[{"d":"26/mai-2T","est":6000,"real":190,"desc":0,"tE":0.005,"tR":0.045,"efPrev":15,"ausP":1,"efReal":14},{"d":"27/mai-1T","est":6000,"real":6001,"desc":0,"tE":0.167,"tR":0.323,"efPrev":21,"ausP":1,"efReal":20},{"d":"27/mai-2T","est":6000,"real":5021,"desc":0,"tE":0.139,"tR":0.272,"efPrev":15,"ausP":0,"efReal":15},{"d":"28/mai-1T","est":6000,"real":6001,"desc":0,"tE":0.167,"tR":0.335,"efPrev":21,"ausP":1,"efReal":20},{"d":"28/mai-2T","est":1802,"real":2589,"desc":0,"tE":0.072,"tR":0.121,"efPrev":15,"ausP":0,"efReal":15}]},{"id":"261001C004","per":"20–26/mai","mes":"Mai/26","q":"Q2","conc":"1000 UI","dias":5,"plan":22015,"prod":22011,"desc":4,"tEstE4":14.67,"tRealE4a":31.97,"pnp":12.48,"oee":{"rot1":0.383,"rot2":0.383,"esteira":0.459,"bla":0.383,"unit":0.383},"desvAb":0,"desvAtras":0,"diarios":[{"d":"20/mai","est":6000,"real":515,"desc":4,"tE":0.014,"tR":0.181,"efPrev":21,"ausP":1,"efReal":20},{"d":"21/mai","est":6000,"real":5497,"desc":0,"tE":0.153,"tR":0.339,"efPrev":21,"ausP":1,"efReal":20},{"d":"22/mai","est":6000,"real":4999,"desc":0,"tE":0.139,"tR":0.352,"efPrev":21,"ausP":1,"efReal":20},{"d":"23/mai","est":6000,"real":5400,"desc":0,"tE":0.15,"tR":0.352,"efPrev":21,"ausP":2,"efReal":19},{"d":"26/mai","est":6000,"real":5600,"desc":0,"tE":0.156,"tR":0.372,"efPrev":21,"ausP":1,"efReal":20}]},{"id":"261001B006","per":"03-08/jun","mes":"Jun/26","q":"Q2","conc":"500 UI","dias":5,"plan":21938,"prod":21934,"desc":4,"tEstE4":14.61,"tRealE4a":25.78,"pnp":8.33,"oee":{"rot1":0.473,"rot2":0.473,"esteira":0.567,"bla":0.473,"unit":0.473},"desvAb":0,"desvAtras":0,"diarios":[{"d":"03-08/jun","est":21938,"real":21934,"desc":4,"tE":0.60875,"tR":1.074167,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001B008","per":"11-16/jun","mes":"Jun/26","q":"Q2","conc":"500 UI","dias":4,"plan":22119,"prod":22114,"desc":5,"tEstE4":14.73,"tRealE4a":27.93,"pnp":9.48,"oee":{"rot1":0.44,"rot2":0.44,"esteira":0.528,"bla":0.44,"unit":0.44},"desvAb":0,"desvAtras":0,"diarios":[{"d":"11-16/jun","est":22119,"real":22114,"desc":5,"tE":0.61375,"tR":1.16375,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001C006","per":"18-25/Jun","mes":"Jun/26","q":"Q2","conc":"1000 UI","dias":4,"plan":21951,"prod":21950,"desc":1,"tEstE4":14.63,"tRealE4a":17.23,"pnp":3.13,"oee":{"rot1":0.708,"rot2":0.708,"esteira":0.849,"bla":0.708,"unit":0.708},"desvAb":0,"desvAtras":0,"diarios":[{"d":"18-25/Jun","est":21951,"real":21950,"desc":1,"tE":0.609583,"tR":0.717917,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001D003","per":"26/Jun-03/Jul","mes":"Jun/26","q":"Q2","conc":"1500 UI","dias":6,"plan":22024,"prod":22014,"desc":10,"tEstE4":14.66,"tRealE4a":38.76,"pnp":9.97,"oee":{"rot1":0.316,"rot2":0.316,"esteira":0.379,"bla":0.316,"unit":0.316},"desvAb":1,"desvAtras":1,"diarios":[{"d":"26/Jun-03/Jul","est":22024,"real":22014,"desc":10,"tE":0.610833,"tR":1.615,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001B007","per":"07-10/Jul","mes":"Jul/26","q":"Q3","conc":"500 UI","dias":4,"plan":21926,"prod":21923,"desc":3,"tEstE4":14.6,"tRealE4a":20.55,"pnp":3.67,"oee":{"rot1":0.736,"rot2":0.736,"esteira":0.883,"bla":0.736,"unit":0.736},"desvAb":0,"desvAtras":0,"diarios":[{"d":"07-10/Jul","est":21926,"real":21923,"desc":3,"tE":0.608333,"tR":0.85625,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001B009","per":"20-23/jul","mes":"Jul/26","q":"Q3","conc":"500 UI","dias":4,"plan":21834,"prod":21830,"desc":4,"tEstE4":14.55,"tRealE4a":25.3,"pnp":3.5,"oee":{"rot1":0.741,"rot2":0.607,"esteira":0.728,"bla":0.623,"unit":0.595},"desvAb":0,"desvAtras":0,"diarios":[{"d":"20/jul","est":6000,"real":2734,"desc":0,"tE":0.075833,"tR":0.194583,"efPrev":21,"ausP":0,"efReal":20},{"d":"21/jul","est":6000,"real":7100,"desc":4,"tE":0.197083,"tR":0.307083,"efPrev":21,"ausP":0,"efReal":19},{"d":"22/jul","est":6000,"real":7796,"desc":0,"tE":0.215833,"tR":0.330417,"efPrev":21,"ausP":0,"efReal":20},{"d":"23/jul","est":6000,"real":4200,"desc":0,"tE":0.116667,"tR":0.222083,"efPrev":21,"ausP":0,"efReal":20}]},{"id":"261001C005","per":"13-16/jul","mes":"Jul/26","q":"Q3","conc":"1000 UI","dias":4,"plan":21972,"prod":21970,"desc":2,"tEstE4":14.63,"tRealE4a":24.2,"pnp":2.63,"oee":{"rot1":0.604,"rot2":0.604,"esteira":0.725,"bla":0.604,"unit":0.604},"desvAb":1,"desvAtras":0,"diarios":[{"d":"13/jul","est":6000,"real":1971,"desc":0,"tE":0.054167,"tR":0.084167,"efPrev":21,"ausP":2,"efReal":17},{"d":"14/jul","est":6000,"real":7000,"desc":0,"tE":0.194583,"tR":0.308333,"efPrev":21,"ausP":0,"efReal":19},{"d":"15/jul","est":6000,"real":6800,"desc":2,"tE":0.18875,"tR":0.31375,"efPrev":21,"ausP":0,"efReal":19},{"d":"16/jul","est":6000,"real":6199,"desc":0,"tE":0.171667,"tR":0.302083,"efPrev":21,"ausP":0,"efReal":20}]},{"id":"261001B010","per":"03-10/Ago","mes":"Ago/26","q":"Q3","conc":"500 UI","dias":6,"plan":21784,"prod":21778,"desc":6,"tEstE4":14.52,"tRealE4a":38.63,"pnp":12.83,"oee":{"rot1":0.463,"rot2":0.412,"esteira":0.46,"bla":0.39,"unit":0.416},"desvAb":0,"desvAtras":0,"diarios":[{"d":"03/Ago","est":6000,"real":961,"desc":0,"tE":0.02625,"tR":0.10625,"efPrev":21,"ausP":1,"efReal":17},{"d":"04/Ago","est":6000,"real":4522,"desc":0,"tE":0.125,"tR":0.297083,"efPrev":21,"ausP":1,"efReal":20},{"d":"05/Ago","est":6000,"real":4221,"desc":0,"tE":0.116667,"tR":0.302083,"efPrev":21,"ausP":1,"efReal":19},{"d":"06/Ago","est":6000,"real":5501,"desc":6,"tE":0.152917,"tR":0.311667,"efPrev":21,"ausP":1,"efReal":20},{"d":"07/Ago","est":6000,"real":1788,"desc":0,"tE":0.049167,"tR":0.282083,"efPrev":21,"ausP":1,"efReal":20},{"d":"10/Ago","est":6000,"real":4785,"desc":0,"tE":0.049167,"tR":0.310417,"efPrev":21,"ausP":1,"efReal":19}]},{"id":"261001B011","per":"19-24/Ago","mes":"Ago/26","q":"Q3","conc":"500 UI","dias":4,"plan":21707,"prod":21705,"desc":2,"tEstE4":14.47,"tRealE4a":28.78,"pnp":7.85,"oee":{"rot1":0.513,"rot2":0.512,"esteira":0.601,"bla":0.512,"unit":0.514},"desvAb":0,"desvAtras":0,"diarios":[{"d":"19/ago","est":6000,"real":5296,"desc":0,"tE":0.146667,"tR":0.295,"efPrev":21,"ausP":0,"efReal":21},{"d":"20/ago","est":6000,"real":5617,"desc":0,"tE":0.155417,"tR":0.305417,"efPrev":21,"ausP":0,"efReal":20},{"d":"21/ago","est":6000,"real":5592,"desc":2,"tE":0.154583,"tR":0.314583,"efPrev":21,"ausP":0,"efReal":19},{"d":"24/ago","est":6000,"real":5200,"desc":0,"tE":0.144167,"tR":0.28125,"efPrev":21,"ausP":0,"efReal":20}]},{"id":"261001C007","per":"26/Ago-02/Set","mes":"Ago/26","q":"Q3","conc":"500 UI","dias":6,"plan":21939,"prod":21937,"desc":2,"tEstE4":14.62,"tRealE4a":36.77,"pnp":9.7,"oee":{"rot1":0.475,"rot2":0.471,"esteira":0.476,"bla":0.4,"unit":0.422},"desvAb":1,"desvAtras":0,"obs":"Alto índice de descarte de Baxject - avaria no insumo (DEV-SEE-0021-26);\nAlto índice de descarte de cartucho e baixo OEE da esteira — utilização de cartuchos com código 128.","diarios":[{"d":"26/08/2026","est":6000,"real":5138,"desc":0,"tE":0.1425,"tR":0.284583,"efPrev":21,"ausP":1,"efReal":19},{"d":"27/08/2026","est":6000,"real":5299,"desc":0,"tE":0.146667,"tR":0.309583,"efPrev":21,"ausP":0,"efReal":20},{"d":"28/08/2026","est":6000,"real":4900,"desc":0,"tE":0.13625,"tR":0.322083,"efPrev":21,"ausP":1,"efReal":19},{"d":"31/08/2026","est":6000,"real":4300,"desc":0,"tE":0.119583,"tR":0.3125,"efPrev":21,"ausP":2,"efReal":18},{"d":"01/09/2026","est":6000,"real":2229,"desc":0,"tE":0.061667,"tR":0.290833,"efPrev":21,"ausP":0,"efReal":21},{"d":"02/09/2026","est":73,"real":71,"desc":2,"tE":0.00125,"tR":0.011667,"efPrev":21,"ausP":0,"efReal":21}]},{"id":"261001D004","per":"12-17/Ago","mes":"Ago/26","q":"Q3","conc":"1500 UI","dias":4,"plan":22018,"prod":22015,"desc":3,"tEstE4":14.67,"tRealE4a":29.17,"pnp":6.75,"oee":{"rot1":0.514,"rot2":0.494,"esteira":0.618,"bla":0.529,"unit":0.514},"desvAb":1,"desvAtras":0,"diarios":[{"d":"12/Ago","est":6000,"real":5751,"desc":0,"tE":0.159583,"tR":0.295,"efPrev":21,"ausP":1,"efReal":20},{"d":"13/Ago","est":6000,"real":5580,"desc":0,"tE":0.155,"tR":0.305,"efPrev":21,"ausP":3,"efReal":18},{"d":"14/Ago","est":6000,"real":6184,"desc":0,"tE":0.171667,"tR":0.317917,"efPrev":21,"ausP":2,"efReal":19},{"d":"17/Ago","est":6000,"real":4500,"desc":3,"tE":0.125,"tR":0.297083,"efPrev":21,"ausP":1,"efReal":20}]}]</script>
@@ -3012,7 +3117,10 @@ function sheetRow(l, idx) {
       <button class="ins-toggle" data-target="${uid}" onclick="toggleInsRow(this)" title="Expandir/recolher campos de insumos">▼ Insumos</button>
       <button class="ins-toggle" data-target="${uid}_dias" onclick="toggleDiasRow(this)" title="Expandir/recolher dados diários" style="margin-top:4px;background:rgba(34,212,150,0.15);border-color:rgba(34,212,150,0.3);color:var(--green2)">▼ Dias</button>
     </td>
-    <td><button class="row-del" title="Remover lote" onclick="removerLinhaLote(this)">✕</button></td>
+    <td style="text-align:center;white-space:nowrap">
+      <button class="row-edit" title="Editar este lote em painel" onclick="abrirPainelEdicaoLote(this,'lote')">✎</button>
+      <button class="row-del" title="Remover lote" onclick="removerLinhaLote(this)">✕</button>
+    </td>
   `;
 
   // Sub-linha de insumos (colspan = total de colunas = 21)
@@ -3175,6 +3283,101 @@ function addSheetRow() {
 // IDs de lotes removidos na tela (via botão ✕) que ainda precisam ser excluídos
 // do Supabase no próximo "Atualizar Dashboard" — ver salvarLotesSupabase().
 let idsLotesParaExcluir = [];
+
+// ─── Painel de edição focada (1 lote por vez) ──────────────────────────
+// Em vez de editar direto na grade densa, move os campos do lote clicado
+// para um painel maior e mais legível. São os MESMOS elementos <input>/
+// <select>/<textarea> da tabela — só trocam de lugar na tela — então o
+// que for digitado aqui já é exatamente o que applyChanges()/
+// applyKitChanges() vão ler depois. "Concluir edição" apenas devolve os
+// campos para a linha original da tabela.
+const CAMPOS_PAINEL_EDICAO_LOTE = [
+  { classe: 'f-id',      label: 'ID do Lote' },
+  { classe: 'f-per',     label: 'Período' },
+  { classe: 'f-mes',     label: 'Mês' },
+  { classe: 'f-q',       label: 'Trimestre' },
+  { classe: 'f-dias',    label: 'Dias de produção' },
+  { classe: 'f-plan',    label: 'Planejado (un.)' },
+  { classe: 'f-prod',    label: 'Produzido (un.)' },
+  { classe: 'f-desc',    label: 'Descarte (un.)' },
+  { classe: 'f-test',    label: 'Tempo Estimado E4 (h)' },
+  { classe: 'f-treal',   label: 'Tempo Real E4a (h)' },
+  { classe: 'f-pnp',     label: 'PNP (h)' },
+  { classe: 'f-desvab',  label: 'Desvios Abertos' },
+  { classe: 'f-desvatr', label: 'Desvios em Atraso' },
+  { classe: 'f-rot1',    label: 'OEE Rótulo 1 (%)' },
+  { classe: 'f-rot2',    label: 'OEE Rótulo 2 (%)' },
+  { classe: 'f-est',     label: 'OEE Esteira (%)' },
+  { classe: 'f-bla',     label: 'OEE BLA (%)' },
+  { classe: 'f-unit',    label: 'OEE Unitarização (%)' },
+  { classe: 'f-obs',     label: 'Observações', largo: true }
+];
+const CAMPOS_PAINEL_EDICAO_KIT = [
+  { classe: 'f-id',      label: 'ID do Lote' },
+  { classe: 'f-per',     label: 'Período' },
+  { classe: 'f-mes',     label: 'Mês' },
+  { classe: 'f-q',       label: 'Trimestre' },
+  { classe: 'f-dias',    label: 'Dias de produção' },
+  { classe: 'f-plan',    label: 'Planejado (un.)' },
+  { classe: 'f-prod',    label: 'Produzido (un.)' },
+  { classe: 'f-pnp',     label: 'PNP (h)' },
+  { classe: 'f-desvab',  label: 'Desvios Abertos' },
+  { classe: 'f-obs',     label: 'Observações', largo: true }
+];
+
+let painelEdicaoMovidos = []; // [{ el, placeholder }]
+
+function abrirPainelEdicaoLote(btn, tipo) {
+  const tr = btn.closest('tr');
+  if (!tr) return;
+
+  fecharPainelEdicaoLote(); // por segurança, garante que nada ficou pendurado de uma vez anterior
+
+  const idAtual = tr.querySelector('.f-id')?.value?.trim();
+  document.getElementById('painelEdicaoTitulo').textContent =
+    idAtual ? `Editando lote ${idAtual}` : 'Editando lote (sem ID ainda)';
+
+  const campos = tipo === 'kit' ? CAMPOS_PAINEL_EDICAO_KIT : CAMPOS_PAINEL_EDICAO_LOTE;
+  const corpo = document.getElementById('painelEdicaoCorpo');
+  corpo.innerHTML = '';
+  painelEdicaoMovidos = [];
+
+  campos.forEach(campo => {
+    const input = tr.querySelector('.' + campo.classe);
+    if (!input) return;
+
+    const placeholder = document.createComment('painel-edicao-placeholder');
+    input.parentNode.insertBefore(placeholder, input);
+    painelEdicaoMovidos.push({ el: input, placeholder });
+
+    const grupo = document.createElement('div');
+    grupo.className = 'painel-campo' + (campo.largo ? ' painel-campo-largo' : '');
+    const rotulo = document.createElement('label');
+    rotulo.textContent = campo.label;
+    grupo.appendChild(rotulo);
+    grupo.appendChild(input); // move o campo de verdade — nada é copiado
+    corpo.appendChild(grupo);
+  });
+
+  document.getElementById('painelEdicaoOverlay').classList.add('painel-visivel');
+}
+
+function fecharPainelEdicaoLote() {
+  painelEdicaoMovidos.forEach(({ el, placeholder }) => {
+    if (placeholder.parentNode) {
+      placeholder.parentNode.insertBefore(el, placeholder);
+      placeholder.remove();
+    }
+  });
+  painelEdicaoMovidos = [];
+  document.getElementById('painelEdicaoOverlay')?.classList.remove('painel-visivel');
+}
+
+document.addEventListener('keydown', (ev) => {
+  if (ev.code === 'Escape' && document.getElementById('painelEdicaoOverlay')?.classList.contains('painel-visivel')) {
+    fecharPainelEdicaoLote();
+  }
+});
 
 function removerLinhaLote(btn) {
   const trPrincipal = btn.closest('tr');
@@ -3380,7 +3583,10 @@ function kitSheetRow(l, idx) {
       <button class="ins-toggle" data-target="${uid}" onclick="toggleInsRow(this)" title="Expandir/recolher campos de insumos">▼ Insumos</button>
       <button class="ins-toggle" data-target="${uid}_dias" onclick="toggleDiasRow(this)" title="Expandir/recolher dados diários" style="margin-top:4px;background:rgba(34,212,150,0.15);border-color:rgba(34,212,150,0.3);color:var(--green2)">▼ Dias</button>
     </td>
-    <td><button class="row-del" title="Remover lote" onclick="removerLinhaKit(this)">✕</button></td>
+    <td style="text-align:center;white-space:nowrap">
+      <button class="row-edit" title="Editar este lote em painel" onclick="abrirPainelEdicaoLote(this,'kit')">✎</button>
+      <button class="row-del" title="Remover lote" onclick="removerLinhaKit(this)">✕</button>
+    </td>
   `;
 
   // Sub-linha de insumos — mostra os campos assim que KIT_INSUMOS_META for preenchido
@@ -4678,7 +4884,18 @@ function ocultarDashboard() {
   document.getElementById('authOverlay').classList.remove('hidden');
   document.getElementById('dashboardMain').style.display = 'none';
   document.getElementById('userBar').classList.add('hidden');
+  esconderSkeletonLoading(); // sem sessão válida: revela o formulário de login, não fica esperando dados
 }
+
+function esconderSkeletonLoading() {
+  const el = document.getElementById('skeletonOverlay');
+  if (!el) return;
+  el.classList.add('skel-escondido');
+  setTimeout(() => el.remove(), 400);
+}
+// Salvaguarda: se algo impedir o fluxo normal (auth ou carregamento) de chegar
+// até esconderSkeletonLoading(), não deixa a tela travada atrás do skeleton.
+setTimeout(esconderSkeletonLoading, 8000);
 
 async function carregarLotesSupabase() {
   setSyncStatus('⟳ carregando…');
@@ -4734,6 +4951,7 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
   await carregarLotesSupabase();
   mostrarDashboard();
   initDashboard();
+  esconderSkeletonLoading();
 
   _sbEstado = 'pronto';
 });
