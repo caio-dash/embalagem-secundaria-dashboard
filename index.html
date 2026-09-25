@@ -3457,6 +3457,7 @@ carregarLotes();
 
 
 
+
 <!-- ═══════════════════════════════════════════════════════════════════
      MODO TV — apresentação automática em rodízio para telão/kiosk.
      Cada passo mostra APENAS o gráfico pedido, em tela cheia, com o
@@ -3466,6 +3467,9 @@ carregarLotes();
      No passo "Progresso acumulado de lotes", o gráfico é reconstruído
      com granularidade mensal (12 pontos, Jan–Dez) em vez da visão
      semanal padrão do dashboard.
+     Também inclui: atualização silenciosa dos dados em segundo plano
+     (sem interromper o que está na tela) e controles manuais de
+     navegação/pausa (botões e teclado).
      ═══════════════════════════════════════════════════════════════════ -->
 <style>
   #btn-modo-tv {
@@ -3497,7 +3501,7 @@ carregarLotes();
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 48px 56px;
+    padding: 48px 56px 96px;
     box-sizing: border-box;
   }
   body.tv-ativo #tvStage.tv-visivel { display: flex; }
@@ -3531,6 +3535,50 @@ carregarLotes();
   #tvStageCorpo .chart-panel .chart-wrap { flex: 1 1 auto; height: auto !important; min-height: 0; }
   #tvStageCorpo .chart-panel > .chart-actions,
   #tvStageCorpo .chart-panel button { display: none !important; }
+
+  /* Barra de controles manuais — fica sobre o palco, sempre visível */
+  #tvControles {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100000;
+    display: none;
+    align-items: center;
+    gap: 14px;
+    background: rgba(20,22,32,0.82);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 40px;
+    padding: 10px 18px;
+    backdrop-filter: blur(6px);
+  }
+  body.tv-ativo #tvControles.tv-visivel { display: flex; }
+  #tvControles button {
+    background: rgba(255,255,255,0.08);
+    border: none;
+    color: #e6e9ef;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+  }
+  #tvControles button:hover { background: rgba(255,255,255,0.18); }
+  #tvControles #tvBtnPausar { width: 46px; height: 46px; background: rgba(37,99,235,0.85); }
+  #tvControles #tvBtnPausar:hover { background: rgba(37,99,235,1); }
+  #tvControles #tvBtnSair { background: rgba(220,38,38,0.75); margin-left: 4px; }
+  #tvControles #tvBtnSair:hover { background: rgba(220,38,38,0.95); }
+  #tvIndicador {
+    color: rgba(230,233,239,0.75);
+    font-size: 12px;
+    min-width: 92px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
 </style>
 
 <button id="btn-modo-tv" onclick="toggleModoTV()">▶ Iniciar Modo TV</button>
@@ -3538,10 +3586,24 @@ carregarLotes();
   <div id="tvStageTitulo"></div>
   <div id="tvStageCorpo"></div>
 </div>
+<div id="tvControles">
+  <button id="tvBtnAnterior" onclick="tvIrAnterior()" title="Anterior (seta ←)">◀</button>
+  <button id="tvBtnPausar" onclick="tvTogglePausa()" title="Pausar/retomar (espaço)">⏸</button>
+  <button id="tvBtnProximo" onclick="tvIrProximo()" title="Próximo (seta →)">▶</button>
+  <span id="tvIndicador"></span>
+  <button id="tvBtnSair" onclick="pararModoTV()" title="Sair do Modo TV (Esc)">✕</button>
+</div>
 
 <script>
-  let tvTimerId = null;
-  let indicePassoTV = 0;
+  // ─── Estado do Modo TV ──────────────────────────────────────────────
+  let indicePassoTV = 0;         // passo principal atualmente exibido (0..passosTV.length-1)
+  let tvPaineisAtuais = null;    // lista de painéis do passo atual, quando é 'zoom-sequencia'
+  let tvIdxZoomAtual = 0;        // índice dentro de tvPaineisAtuais
+  let tvTimerId = null;          // timer do avanço automático
+  let tvPausado = false;
+  let tvIntervaloDados = null;   // atualização silenciosa de dados em segundo plano
+
+  const TV_ATUALIZACAO_DADOS_MS = 10 * 60 * 1000; // recarrega os dados a cada 10 min
 
   // "zoom-sequencia": mostra cada gráfico dentro do container, um de cada vez,
   // por duracaoItemMs. "grafico": mostra um único gráfico por duracaoMs.
@@ -3567,6 +3629,7 @@ carregarLotes();
     if (!tvEstaAtivo()) {
       document.body.classList.add('tv-ativo');
       btn.innerText = '⏹ Sair do Modo TV';
+      document.getElementById('tvControles').classList.add('tv-visivel');
 
       if (document.documentElement.requestFullscreen) {
         document.documentElement.requestFullscreen().catch(() => {});
@@ -3574,8 +3637,18 @@ carregarLotes();
 
       aplicarFiltroMesAtual();
 
+      tvPausado = false;
+      atualizarBotaoPausaTV();
       indicePassoTV = 0;
-      rodarProximoPassoTV();
+      mostrarPassoPrincipalTV(0);
+
+      // Atualização silenciosa dos dados em segundo plano, sem interromper
+      // o que está sendo exibido no momento — só entra em vigor na próxima
+      // troca de gráfico, quando showSection() recalcula tudo com os dados novos.
+      clearInterval(tvIntervaloDados);
+      tvIntervaloDados = setInterval(() => {
+        if (tvEstaAtivo()) atualizarDadosSilenciosoTV();
+      }, TV_ATUALIZACAO_DADOS_MS);
     } else {
       pararModoTV();
     }
@@ -3584,7 +3657,9 @@ carregarLotes();
   function pararModoTV() {
     document.body.classList.remove('tv-ativo');
     document.getElementById('btn-modo-tv').innerText = '▶ Iniciar Modo TV';
+    document.getElementById('tvControles').classList.remove('tv-visivel');
     clearTimeout(tvTimerId);
+    clearInterval(tvIntervaloDados);
     restaurarPalcoTV();
     document.getElementById('tvStage').classList.remove('tv-visivel');
 
@@ -3593,17 +3668,139 @@ carregarLotes();
     }
   }
 
-  function rodarProximoPassoTV() {
+  // Recarrega os lotes do Supabase sem mexer na navegação/seção visível —
+  // ao contrário de carregarLotes(), NÃO chama initDashboard() (que forçaria
+  // a volta pra aba "Por Lote"). Os dados só "aparecem" quando o próximo
+  // passo do rodízio chamar showSection(), que reconstrói o gráfico com o
+  // LOTES já atualizado.
+  async function atualizarDadosSilenciosoTV() {
+    try {
+      if (!sb) return;
+      const { data, error } = await sb.from('lotes').select('*').order('updated_at', { ascending: true });
+      if (!error && data && data.length > 0) {
+        LOTES = data.map(r => r.dados).filter(Boolean);
+        sortLotesCronologico();
+        setSyncStatus('✓ ' + LOTES.length + ' lotes · ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), 'var(--green2)');
+      }
+    } catch (e) {
+      // mantém os dados atuais em caso de falha de rede — tenta de novo no próximo ciclo
+    }
+    try { await carregarKitLotesSupabase(); } catch (e) {}
+  }
+
+  // ─── Navegação principal ────────────────────────────────────────────
+  function mostrarPassoPrincipalTV(idx, zoomInicial) {
+    indicePassoTV = ((idx % passosTV.length) + passosTV.length) % passosTV.length;
+    tvPaineisAtuais = null;
+    tvIdxZoomAtual = zoomInicial || 0;
+
+    const passo = passosTV[indicePassoTV];
+    prepararPalcoParaSecao(passo.secao);
+
+    setTimeout(() => {
+      if (!tvEstaAtivo()) return;
+
+      if (passo.tipo === 'zoom-sequencia') {
+        const container = document.getElementById(passo.containerId);
+        tvPaineisAtuais = container ? Array.from(container.querySelectorAll('.chart-panel')) : [];
+        if (!tvPaineisAtuais.length) {
+          irProximoTV(); // nada pra mostrar aqui, pula pro próximo passo
+          return;
+        }
+        if (tvIdxZoomAtual >= tvPaineisAtuais.length) tvIdxZoomAtual = tvPaineisAtuais.length - 1;
+        mostrarZoomAtualTV();
+      } else {
+        if (passo.granularidadeAnual) renderProgressoAnualPorMesTV();
+        moverGraficoParaPalco(passo.canvasId);
+        atualizarIndicadorTV();
+        agendarProximoTV(passo.duracaoMs);
+      }
+    }, 350);
+  }
+
+  function mostrarZoomAtualTV() {
+    restaurarPalcoTV();
+    const painel = tvPaineisAtuais[tvIdxZoomAtual];
+    const tituloTexto = painel.querySelector('.chart-title')?.textContent?.trim() || '';
+    colocarNoPalco(painel, tituloTexto);
+    atualizarIndicadorTV();
+    agendarProximoTV(passosTV[indicePassoTV].duracaoItemMs);
+  }
+
+  function agendarProximoTV(ms) {
+    clearTimeout(tvTimerId);
+    if (tvPausado) return;
+    tvTimerId = setTimeout(irProximoTV, ms);
+  }
+
+  function irProximoTV() {
     if (!tvEstaAtivo()) return;
     const passo = passosTV[indicePassoTV];
-    indicePassoTV = (indicePassoTV + 1) % passosTV.length;
-
-    if (passo.tipo === 'zoom-sequencia') {
-      executarSequenciaZoomTV(passo);
+    if (passo.tipo === 'zoom-sequencia' && tvPaineisAtuais && tvIdxZoomAtual + 1 < tvPaineisAtuais.length) {
+      tvIdxZoomAtual++;
+      mostrarZoomAtualTV();
     } else {
-      executarPassoUnicoTV(passo);
+      mostrarPassoPrincipalTV(indicePassoTV + 1, 0);
     }
   }
+
+  function tvIrProximo() {
+    clearTimeout(tvTimerId);
+    irProximoTV();
+  }
+
+  function tvIrAnterior() {
+    clearTimeout(tvTimerId);
+    const passo = passosTV[indicePassoTV];
+    if (passo.tipo === 'zoom-sequencia' && tvPaineisAtuais && tvIdxZoomAtual > 0) {
+      tvIdxZoomAtual--;
+      mostrarZoomAtualTV();
+    } else {
+      mostrarPassoPrincipalTV(indicePassoTV - 1, 0);
+    }
+  }
+
+  function tvTogglePausa() {
+    tvPausado = !tvPausado;
+    atualizarBotaoPausaTV();
+    if (tvPausado) {
+      clearTimeout(tvTimerId);
+    } else {
+      // retoma com a duração completa do item atual
+      const passo = passosTV[indicePassoTV];
+      const ms = passo.tipo === 'zoom-sequencia' ? passo.duracaoItemMs : passo.duracaoMs;
+      agendarProximoTV(ms);
+    }
+  }
+
+  function atualizarBotaoPausaTV() {
+    const btn = document.getElementById('tvBtnPausar');
+    if (btn) btn.textContent = tvPausado ? '▶' : '⏸';
+  }
+
+  function atualizarIndicadorTV() {
+    const el = document.getElementById('tvIndicador');
+    if (!el) return;
+    const passo = passosTV[indicePassoTV];
+    const posPrincipal = `${indicePassoTV + 1}/${passosTV.length}`;
+    if (passo.tipo === 'zoom-sequencia' && tvPaineisAtuais && tvPaineisAtuais.length) {
+      el.textContent = `${posPrincipal} · item ${tvIdxZoomAtual + 1}/${tvPaineisAtuais.length}`;
+    } else {
+      el.textContent = posPrincipal;
+    }
+  }
+
+  // Atalhos de teclado: espaço pausa/retoma, setas navegam, Esc sai — só enquanto o Modo TV está ativo.
+  // O Esc é tratado aqui diretamente (não só via 'fullscreenchange'), porque em alguns
+  // navegadores/ambientes o requestFullscreen() pode falhar ou ser bloqueado — nesse caso o Esc
+  // nunca dispara o evento de saída de tela cheia, e o Modo TV ficaria preso sem alternativa.
+  document.addEventListener('keydown', (ev) => {
+    if (!tvEstaAtivo()) return;
+    if (ev.code === 'Space') { ev.preventDefault(); tvTogglePausa(); }
+    else if (ev.code === 'ArrowRight') { ev.preventDefault(); tvIrProximo(); }
+    else if (ev.code === 'ArrowLeft') { ev.preventDefault(); tvIrAnterior(); }
+    else if (ev.code === 'Escape') { ev.preventDefault(); pararModoTV(); }
+  });
 
   function prepararPalcoParaSecao(secao) {
     restaurarPalcoTV();
@@ -3619,52 +3816,6 @@ carregarLotes();
     stage.classList.add('tv-visivel');
     tituloEl.textContent = 'Carregando…';
     corpo.innerHTML = '';
-  }
-
-  function executarPassoUnicoTV(passo) {
-    prepararPalcoParaSecao(passo.secao);
-
-    setTimeout(() => {
-      if (!tvEstaAtivo()) return;
-
-      // Passo especial: Progresso Acumulado em granularidade anual (por mês)
-      // em vez da visão semanal padrão do dashboard.
-      if (passo.granularidadeAnual) renderProgressoAnualPorMesTV();
-
-      moverGraficoParaPalco(passo.canvasId);
-      tvTimerId = setTimeout(rodarProximoPassoTV, passo.duracaoMs);
-    }, 350);
-  }
-
-  function executarSequenciaZoomTV(passo) {
-    prepararPalcoParaSecao(passo.secao);
-
-    setTimeout(() => {
-      if (!tvEstaAtivo()) return;
-      const container = document.getElementById(passo.containerId);
-      const paineis = container ? Array.from(container.querySelectorAll('.chart-panel')) : [];
-      if (!paineis.length) {
-        tvTimerId = setTimeout(rodarProximoPassoTV, 100);
-        return;
-      }
-      rodarZoomItemTV(paineis, 0, passo.duracaoItemMs);
-    }, 350);
-  }
-
-  function rodarZoomItemTV(paineis, idx, duracaoMs) {
-    if (!tvEstaAtivo()) return;
-    restaurarPalcoTV();
-
-    if (idx >= paineis.length) {
-      // terminou a sequência de zoom individual: segue para o próximo passo principal
-      tvTimerId = setTimeout(rodarProximoPassoTV, 50);
-      return;
-    }
-
-    const painel = paineis[idx];
-    const tituloTexto = painel.querySelector('.chart-title')?.textContent?.trim() || '';
-    colocarNoPalco(painel, tituloTexto);
-    tvTimerId = setTimeout(() => rodarZoomItemTV(paineis, idx + 1, duracaoMs), duracaoMs);
   }
 
   function moverGraficoParaPalco(canvasId) {
