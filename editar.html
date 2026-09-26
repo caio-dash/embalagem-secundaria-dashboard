@@ -346,6 +346,21 @@ select.cell option { background: var(--bg3); color: var(--text); }
 </head>
 <body>
 
+<script>
+  // ─── Escala responsiva da interface (inclui a fonte) ───────────────────
+  // Ver explicação completa no dashboard de Visualização — mesma lógica aqui.
+  (function () {
+    function aplicarEscalaResponsiva() {
+      const largura = window.innerWidth;
+      let escala = 1 + (largura - 1280) / 1280 * 0.35;
+      escala = Math.min(Math.max(escala, 0.82), 1.85);
+      document.documentElement.style.zoom = escala;
+    }
+    aplicarEscalaResponsiva();
+    window.addEventListener('resize', aplicarEscalaResponsiva);
+  })();
+</script>
+
 <!-- ── SKELETON LOADING ── visível por padrão; some assim que o login/dados ficam prontos ── -->
 <div id="skeletonOverlay">
   <div class="skel-bloco skel-nav"></div>
