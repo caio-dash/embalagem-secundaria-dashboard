@@ -282,6 +282,28 @@ select.cell option { background: var(--bg3); color: var(--text); }
 </head>
 <body>
 
+<script>
+  // ─── Escala responsiva da interface (inclui a fonte) ───────────────────
+  // Quase todo o CSS deste arquivo usa px fixo (não rem), então mudar
+  // html{font-size} sozinho não teria efeito na maioria do texto. Em vez
+  // disso, escalamos a página inteira via `zoom`, que ajusta
+  // proporcionalmente tudo — inclusive fontes, respeitando o texto de cada
+  // componente sem precisar reescrever centenas de regras CSS.
+  // Referência: 1280px de largura = escala 1 (tamanho original do design).
+  // Isso deixa a interface um pouco menor em celular e maior em monitores
+  // grandes/TVs — importante especialmente para o Modo TV, visto de longe.
+  (function () {
+    function aplicarEscalaResponsiva() {
+      const largura = window.innerWidth;
+      let escala = 1 + (largura - 1280) / 1280 * 0.35;
+      escala = Math.min(Math.max(escala, 0.82), 1.85);
+      document.documentElement.style.zoom = escala;
+    }
+    aplicarEscalaResponsiva();
+    window.addEventListener('resize', aplicarEscalaResponsiva);
+  })();
+</script>
+
 <!-- ── SKELETON LOADING ── visível por padrão; some assim que os dados chegam ── -->
 <div id="skeletonOverlay">
   <div class="skel-bloco skel-nav"></div>
@@ -3568,6 +3590,7 @@ carregarLotes();
     color: var(--text, #e6e9ef);
     margin-bottom: 24px;
     text-align: center;
+    transition: opacity .35s ease;
   }
   #tvStageCorpo {
     width: 100%;
@@ -3578,6 +3601,7 @@ carregarLotes();
     align-items: center;
     justify-content: center;
     overflow: auto;
+    transition: opacity .35s ease;
   }
   #tvStageCorpo .chart-panel {
     width: 100%;
@@ -3745,42 +3769,73 @@ carregarLotes();
   }
 
   // ─── Navegação principal ────────────────────────────────────────────
+  const TV_FADE_MS = 350;
+
+  // Faz fade-out do conteúdo atual do palco antes de trocar (se já houver algo visível),
+  // executa `cb` já com o palco invisível, e quem chamar `cb` é responsável por
+  // chamar tvFadeIn() quando o novo conteúdo estiver pronto.
+  function tvFadeOut(cb) {
+    if (!tvElementoAtual) { cb(); return; } // nada visível ainda (1ª exibição): pula a espera do fade
+    const corpo = document.getElementById('tvStageCorpo');
+    const tituloEl = document.getElementById('tvStageTitulo');
+    corpo.style.opacity = '0';
+    tituloEl.style.opacity = '0';
+    setTimeout(cb, TV_FADE_MS);
+  }
+
+  function tvFadeIn() {
+    const corpo = document.getElementById('tvStageCorpo');
+    const tituloEl = document.getElementById('tvStageTitulo');
+    void corpo.offsetWidth; // força o navegador a "commitar" o opacity:0 antes de animar de volta pra 1
+    corpo.style.opacity = '1';
+    tituloEl.style.opacity = '1';
+  }
+
   function mostrarPassoPrincipalTV(idx, zoomInicial) {
     indicePassoTV = ((idx % passosTV.length) + passosTV.length) % passosTV.length;
     tvPaineisAtuais = null;
     tvIdxZoomAtual = zoomInicial || 0;
 
     const passo = passosTV[indicePassoTV];
-    prepararPalcoParaSecao(passo.secao);
 
-    setTimeout(() => {
-      if (!tvEstaAtivo()) return;
+    tvFadeOut(() => {
+      prepararPalcoParaSecao(passo.secao);
 
-      if (passo.tipo === 'zoom-sequencia') {
-        const container = document.getElementById(passo.containerId);
-        tvPaineisAtuais = container ? Array.from(container.querySelectorAll('.chart-panel')) : [];
-        if (!tvPaineisAtuais.length) {
-          irProximoTV(); // nada pra mostrar aqui, pula pro próximo passo
-          return;
+      setTimeout(() => {
+        if (!tvEstaAtivo()) return;
+
+        if (passo.tipo === 'zoom-sequencia') {
+          const container = document.getElementById(passo.containerId);
+          tvPaineisAtuais = container ? Array.from(container.querySelectorAll('.chart-panel')) : [];
+          if (!tvPaineisAtuais.length) {
+            irProximoTV(); // nada pra mostrar aqui, pula pro próximo passo
+            return;
+          }
+          if (tvIdxZoomAtual >= tvPaineisAtuais.length) tvIdxZoomAtual = tvPaineisAtuais.length - 1;
+          mostrarZoomAtualTV(true); // já estamos em fade-out — não repete
+        } else {
+          if (passo.granularidadeAnual) renderProgressoAnualPorMesTV();
+          moverGraficoParaPalco(passo.canvasId);
+          atualizarIndicadorTV();
+          tvFadeIn();
+          agendarProximoTV(passo.duracaoMs);
         }
-        if (tvIdxZoomAtual >= tvPaineisAtuais.length) tvIdxZoomAtual = tvPaineisAtuais.length - 1;
-        mostrarZoomAtualTV();
-      } else {
-        if (passo.granularidadeAnual) renderProgressoAnualPorMesTV();
-        moverGraficoParaPalco(passo.canvasId);
-        atualizarIndicadorTV();
-        agendarProximoTV(passo.duracaoMs);
-      }
-    }, 350);
+      }, 350);
+    });
   }
 
-  function mostrarZoomAtualTV() {
-    restaurarPalcoTV();
-    const painel = tvPaineisAtuais[tvIdxZoomAtual];
-    const tituloTexto = painel.querySelector('.chart-title')?.textContent?.trim() || '';
-    colocarNoPalco(painel, tituloTexto);
-    atualizarIndicadorTV();
-    agendarProximoTV(passosTV[indicePassoTV].duracaoItemMs);
+  function mostrarZoomAtualTV(jaEmFade) {
+    const trocar = () => {
+      restaurarPalcoTV();
+      const painel = tvPaineisAtuais[tvIdxZoomAtual];
+      const tituloTexto = painel.querySelector('.chart-title')?.textContent?.trim() || '';
+      colocarNoPalco(painel, tituloTexto);
+      atualizarIndicadorTV();
+      tvFadeIn();
+      agendarProximoTV(passosTV[indicePassoTV].duracaoItemMs);
+    };
+    if (jaEmFade) trocar();
+    else tvFadeOut(trocar);
   }
 
   function agendarProximoTV(ms) {
