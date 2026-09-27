@@ -415,6 +415,12 @@ select.cell option { background: var(--bg3); color: var(--text); }
 </div>
 
 <div id="dashboardMain">
+<div id="lembreteBackupExterno" style="display:none;align-items:center;gap:12px;background:rgba(245,166,35,0.12);border-bottom:1px solid rgba(245,166,35,0.3);color:#f5a623;font-size:12px;padding:9px 20px;flex-wrap:wrap">
+  <span>⚠</span>
+  <span id="lembreteBackupExternoTexto" style="flex:1;min-width:200px"></span>
+  <button type="button" class="lote-btn" style="padding:3px 10px;font-size:11px" onclick="baixarBackupExterno()">⬇ Baixar agora</button>
+  <button type="button" onclick="esconderLembreteBackupExterno()" title="Dispensar por agora" style="background:none;border:none;color:#f5a623;cursor:pointer;font-size:13px;padding:2px 6px">✕</button>
+</div>
 <nav>
   <div class="nav-logo">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"></rect><path d="M3 9h18M9 21V9"></path></svg>
@@ -1110,6 +1116,8 @@ select.cell option { background: var(--bg3); color: var(--text); }
     <button class="btn btn-secondary" onclick="addSheetRow()">+ Adicionar Lote</button>
     <button class="btn btn-primary" style="background:var(--green2)" onclick="baixarHTMLAtualizado()">💾 Baixar HTML</button>
     <button type="button" class="lote-btn" onclick="abrirBackupsModal()" title="Ver e restaurar cópias de segurança automáticas">🕐 Backups</button>
+    <button type="button" class="lote-btn" onclick="baixarBackupExterno()" title="Baixa um arquivo .json com todos os dados, para guardar fora do Supabase">⬇ Backup Externo</button>
+    <span id="statusBackupAutomatico" style="font-size:11px;color:var(--text3)" title="Snapshot automático diário, gerado pelo próprio banco (às 3h), independente do dashboard estar aberto"></span>
     <span id="sheetSyncStatus" style="font-size:11px;color:var(--text3);margin-left:4px"></span>
     <span class="sheet-hint">OEE em % (ex.: 69 = 69%). Deixe PNP ou OEE em branco para "sem dados". Ao digitar o Período (dd–dd/mmm ou dd/mmm–dd/mmm) e sair do campo, Mês/Trim./Dias ⚡ são calculados automaticamente (dias úteis, sem sáb./dom.).</span>
   </div>
@@ -3796,12 +3804,30 @@ function setKitSyncStatus(msg, cor) {
   if (el) { el.textContent = msg; if (cor) el.style.color = cor; }
 }
 
+// Snapshot equivalente ao de "lotes" (ver existeConflitoDeEdicaoLotes), aqui pro Kit Médico
+let snapshotKitLotes = { maxUpdatedAt: null, count: null };
+
+async function existeConflitoDeEdicaoKit() {
+  if (snapshotKitLotes.maxUpdatedAt === null && snapshotKitLotes.count === null) return false;
+  try {
+    const { data, error } = await sb.from('kit_medico_lotes').select('updated_at').order('updated_at', { ascending: false }).limit(1);
+    const { count, error: errCount } = await sb.from('kit_medico_lotes').select('id', { count: 'exact', head: true });
+    if (error || errCount) return false;
+    const maxAtualServidor = data && data[0] ? data[0].updated_at : null;
+    return maxAtualServidor !== snapshotKitLotes.maxUpdatedAt || count !== snapshotKitLotes.count;
+  } catch (e) {
+    return false;
+  }
+}
+
 async function carregarKitLotesSupabase() {
   if (!sb) return;
   try {
     const { data, error } = await sb.from('kit_medico_lotes').select('*').order('updated_at', { ascending: true });
     if (!error && data) {
       KIT_LOTES = data.map(r => r.dados).filter(Boolean);
+      const datas = data.map(r => r.updated_at).filter(Boolean).sort();
+      snapshotKitLotes = { maxUpdatedAt: datas.length ? datas[datas.length - 1] : null, count: data.length };
     }
   } catch (e) {
     console.error('Erro ao carregar Kit Médico:', e);
@@ -3815,6 +3841,19 @@ async function salvarKitLotesSupabase() {
   if (!sb) { setKitSyncStatus('dados locais (sem conexão)', 'var(--text3)'); return; }
   const { data: sessao } = await sb.auth.getSession();
   if (!sessao?.session) return;
+
+  const conflito = await existeConflitoDeEdicaoKit();
+  if (conflito) {
+    const prosseguir = confirm(
+      'Os dados do Kit Médico no servidor podem ter sido alterados por outra pessoa desde que você abriu esta página.\n\n' +
+      'Se continuar, suas alterações vão SOBRESCREVER o que essa outra pessoa salvou.\n\n' +
+      'Clique OK para salvar mesmo assim, ou Cancelar para recarregar a página antes de continuar (recomendado).'
+    );
+    if (!prosseguir) {
+      setKitSyncStatus('⚠ salvamento cancelado — recarregue a página', '#f5a623');
+      return;
+    }
+  }
 
   await criarBackup('kit_medico_lotes'); // backup automático do estado atual, antes de sobrescrever
 
@@ -3845,6 +3884,8 @@ async function salvarKitLotesSupabase() {
     }
     idsKitLotesParaExcluir = [];
   }
+
+  snapshotKitLotes = { maxUpdatedAt: rows[0]?.updated_at || new Date().toISOString(), count: KIT_LOTES.length };
 
   setKitSyncStatus('✓ salvo · ' + new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }), 'var(--green2)');
 }
@@ -4015,6 +4056,83 @@ function baixarHTMLAtualizado() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   showToast('💾 Arquivo baixado! Substitua o HTML antigo por este para manter os dados.');
+}
+
+// ─── Backup EXTERNO (fora do Supabase) ─────────────────────────────────
+// Os backups do botão "🕐 Backups" ficam gravados no próprio Supabase — se o
+// projeto tiver um problema sério (exclusão acidental, cobrança em atraso,
+// etc.), eles vão junto com os dados originais. Este botão baixa um arquivo
+// .json pro computador de quem estiver logado, pra guardar em outro lugar
+// (e-mail, Google Drive, pasta compartilhada) — uma cópia que sobrevive
+// mesmo que o Supabase saia do ar.
+const CHAVE_ULTIMO_BACKUP_EXTERNO = 'ultimoBackupExternoEm';
+const DIAS_PARA_LEMBRETE_BACKUP = 14;
+
+function baixarBackupExterno() {
+  const pacote = {
+    exportadoEm: new Date().toISOString(),
+    exportadoPor: (typeof currentUserEmail !== 'undefined' && currentUserEmail) || null,
+    lotes: LOTES,
+    kitMedicoLotes: (typeof KIT_LOTES !== 'undefined') ? KIT_LOTES : []
+  };
+
+  const blob = new Blob([JSON.stringify(pacote, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'backup-embalagem-secundaria-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  try { localStorage.setItem(CHAVE_ULTIMO_BACKUP_EXTERNO, new Date().toISOString()); } catch (e) {}
+  esconderLembreteBackupExterno();
+  showToast('⬇ Backup externo baixado — guarde em um local fora do Supabase (e-mail, Drive, etc.)');
+}
+
+function esconderLembreteBackupExterno() {
+  const el = document.getElementById('lembreteBackupExterno');
+  if (el) el.style.display = 'none';
+}
+
+function verificarLembreteBackupExterno() {
+  let ultimoISO = null;
+  try { ultimoISO = localStorage.getItem(CHAVE_ULTIMO_BACKUP_EXTERNO); } catch (e) {}
+
+  const el = document.getElementById('lembreteBackupExterno');
+  const texto = document.getElementById('lembreteBackupExternoTexto');
+  if (!el || !texto) return;
+
+  if (!ultimoISO) {
+    texto.textContent = 'Você ainda não fez nenhum backup externo (fora do Supabase) dos dados deste dashboard.';
+    el.style.display = 'flex';
+    return;
+  }
+
+  const dias = Math.floor((Date.now() - new Date(ultimoISO).getTime()) / (1000 * 60 * 60 * 24));
+  if (dias >= DIAS_PARA_LEMBRETE_BACKUP) {
+    texto.textContent = `Já se passaram ${dias} dias desde o último backup externo. Vale baixar um novo.`;
+    el.style.display = 'flex';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+// Mostra quando rodou o último snapshot automático diário (gerado pelo próprio
+// banco via pg_cron, na tabela separada 'backups_externos' — roda sozinho,
+// independente de alguém abrir este dashboard).
+async function atualizarStatusBackupAutomatico() {
+  const el = document.getElementById('statusBackupAutomatico');
+  if (!el || !sb) return;
+  try {
+    const { data, error } = await sb.from('backups_externos').select('criado_em').order('criado_em', { ascending: false }).limit(1);
+    if (error || !data || !data.length) { el.textContent = ''; return; }
+    const quando = new Date(data[0].criado_em);
+    el.textContent = '🤖 Backup automático: ' + quando.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    el.textContent = '';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -4912,6 +5030,32 @@ function esconderSkeletonLoading() {
 // até esconderSkeletonLoading(), não deixa a tela travada atrás do skeleton.
 setTimeout(esconderSkeletonLoading, 8000);
 
+// Snapshot de quando os dados de "lotes" foram carregados/salvos pela última vez nesta
+// aba — usado para detectar se outra pessoa alterou o Supabase nesse meio-tempo, antes
+// de sobrescrever silenciosamente o trabalho dela num próximo salvamento.
+let snapshotLotes = { maxUpdatedAt: null, count: null };
+
+function atualizarSnapshotLotesDe(dados) {
+  if (!Array.isArray(dados)) return;
+  const datas = dados.map(r => r.updated_at).filter(Boolean).sort();
+  snapshotLotes = { maxUpdatedAt: datas.length ? datas[datas.length - 1] : null, count: dados.length };
+}
+
+// Verifica no servidor se o estado mudou desde o snapshot atual. Em caso de falha de
+// rede, não bloqueia o salvamento (evita travar o fluxo por um problema de conexão).
+async function existeConflitoDeEdicaoLotes() {
+  if (snapshotLotes.maxUpdatedAt === null && snapshotLotes.count === null) return false; // sem snapshot ainda
+  try {
+    const { data, error } = await sb.from('lotes').select('updated_at').order('updated_at', { ascending: false }).limit(1);
+    const { count, error: errCount } = await sb.from('lotes').select('id', { count: 'exact', head: true });
+    if (error || errCount) return false;
+    const maxAtualServidor = data && data[0] ? data[0].updated_at : null;
+    return maxAtualServidor !== snapshotLotes.maxUpdatedAt || count !== snapshotLotes.count;
+  } catch (e) {
+    return false;
+  }
+}
+
 async function carregarLotesSupabase() {
   setSyncStatus('⟳ carregando…');
   try {
@@ -4921,6 +5065,7 @@ async function carregarLotesSupabase() {
       setSyncStatus('⚠ ' + error.message + ' — dados locais', '#f5a623');
     } else if (data && data.length > 0) {
       LOTES = data.map(row => row.dados).filter(Boolean);
+      atualizarSnapshotLotesDe(data);
       setSyncStatus('✓ ' + LOTES.length + ' lotes · ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}), 'var(--green2)');
     } else {
       setSyncStatus('⟳ banco vazio — enviando dados locais…');
@@ -4967,6 +5112,8 @@ if (sb) sb.auth.onAuthStateChange(async (event, session) => {
   mostrarDashboard();
   initDashboard();
   esconderSkeletonLoading();
+  verificarLembreteBackupExterno();
+  atualizarStatusBackupAutomatico();
 
   _sbEstado = 'pronto';
 });
@@ -5053,6 +5200,21 @@ async function salvarLotesSupabase(silencioso) {
   const { data: sessao } = await sb.auth.getSession();
   if (!sessao?.session) return; // não autenticado, ignora
 
+  if (!silencioso) {
+    const conflito = await existeConflitoDeEdicaoLotes();
+    if (conflito) {
+      const prosseguir = confirm(
+        'Os dados no servidor podem ter sido alterados por outra pessoa desde que você abriu esta página.\n\n' +
+        'Se continuar, suas alterações vão SOBRESCREVER o que essa outra pessoa salvou.\n\n' +
+        'Clique OK para salvar mesmo assim, ou Cancelar para recarregar a página antes de continuar (recomendado).'
+      );
+      if (!prosseguir) {
+        setSyncStatus('⚠ salvamento cancelado — recarregue a página para ver a versão mais recente', '#f5a623');
+        return;
+      }
+    }
+  }
+
   await criarBackup('lotes'); // backup automático do estado atual, antes de sobrescrever
 
   // Upsert: insere ou atualiza cada lote pelo id
@@ -5083,6 +5245,10 @@ async function salvarLotesSupabase(silencioso) {
     }
     idsLotesParaExcluir = [];
   }
+
+  // Atualiza o snapshot: a partir de agora, ESTA gravação passa a ser a mais recente conhecida
+  const agoraISO = rows[0]?.updated_at || new Date().toISOString();
+  snapshotLotes = { maxUpdatedAt: agoraISO, count: LOTES.length };
 
   setSyncStatus('✓ salvo na nuvem · ' + new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }), 'var(--green2)');
 }
