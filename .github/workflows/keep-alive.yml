@@ -1,0 +1,20 @@
+name: Manter Supabase Ativo
+
+# Roda a cada 3 dias — margem segura dentro do limite de 7 dias de
+# inatividade do plano gratuito do Supabase. Faz uma escrita real no
+# banco (não só um ping de rede), pra garantir que conta como atividade.
+on:
+  schedule:
+    - cron: '0 12 */3 * *'
+  workflow_dispatch: # permite rodar manualmente pela aba "Actions" do GitHub, se precisar testar
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar a função de heartbeat do Supabase
+        run: |
+          curl -sf -X POST "https://jvunnfjzqqkrscjldfkf.supabase.co/functions/v1/keep-alive" \
+            -H "Content-Type: application/json" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            --max-time 30
