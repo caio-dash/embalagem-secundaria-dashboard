@@ -1,10 +1,9 @@
-[README-Dashboard-Embalagem-Secundaria.md](https://github.com/user-attachments/files/32753003/README-Dashboard-Embalagem-Secundaria.md)
 # Dashboard Embalagem Secundária — Documentação Técnica
 
 **Projeto:** Hemobrás — Acompanhamento de produção da linha de Embalagem Secundária
 **Repositório:** https://github.com/caio-dash/embalagem-secundaria-dashboard
 **Backend:** Supabase (projeto `jvunnfjzqqkrscjldfkf`, "Caio Duarte Project", região `us-west-2`)
-**Última atualização deste documento:** 27/09/2026
+**Última atualização deste documento:** 29/09/2026
 
 > Este documento existe para que qualquer pessoa — não só quem construiu o sistema —
 > consiga entender, manter e evoluir este dashboard. Se algo aqui ficar desatualizado
@@ -27,6 +26,15 @@ puro, e falam diretamente com o Supabase pelo SDK `supabase-js` embutido no `<sc
 Não há build, bundler ou processo de compilação: o que está no arquivo `.html` é
 exatamente o que roda no navegador.
 
+Além dos dois HTMLs, existe um terceiro arquivo no repositório, na **mesma pasta**:
+`dados-fallback.json` — a cópia de reserva dos lotes (ver seção 3.5). Ele só é lido
+quando o Supabase não responde.
+
+> **Composição real dos arquivos (medido em 28/09/2026):** ~43% de cada HTML é o
+> Chart.js v4.4.4 embutido de propósito (para não depender de CDN externo), ~32% é o
+> código do app, ~8% CSS/Modo TV. Os dados de lotes eram só ~6–9% — por isso separá-los
+> resolve o problema de dado desatualizado, mas não reduz o tamanho de forma relevante.
+
 ### 1.1 Por que dois arquivos separados (não um só com controle de permissão)?
 
 Separar fisicamente o dashboard público do dashboard de edição significa que quem só
@@ -42,6 +50,8 @@ GitHub integrado a nenhuma ferramenta de IA usada neste projeto. Todo o processo
 manual:
 
 1. Editar o arquivo `.html` (localmente, ou pedindo a uma IA para gerar a versão nova).
+   Se mudou **só o código**, sobe só o `.html`. Se mudou **só a cópia de reserva**,
+   sobe só o `dados-fallback.json` (ver 3.5).
 2. No GitHub, abrir o repositório → clicar no arquivo antigo → **Edit** (ícone de
    lápis) → colar o conteúdo novo → **Commit changes**.
    - Alternativa para arquivos grandes: **Add file → Upload files**, arrastar o
@@ -103,6 +113,28 @@ Usa Supabase Auth (e-mail/senha). **Não há cadastro público** — novos usuá
 precisam ser criados manualmente pelo administrador do projeto, direto no painel do
 Supabase (Authentication → Users → Add user). O dashboard de visualização não exige
 login; o editável exige.
+
+### 3.5 Dados de reserva — `dados-fallback.json` (plano B)
+
+O fluxo normal **não usa** este arquivo: ao abrir, os dois dashboards buscam os lotes
+direto no Supabase (adicionou/editou um lote → todo mundo já vê atualizado, sem nenhum
+passo manual). O `dados-fallback.json` só é baixado se o Supabase der erro, estiver
+fora do ar, ou devolver a tabela vazia.
+
+- **Onde fica:** raiz do repositório, ao lado de `index.html` e `editar.html`. O nome
+  precisa ser exatamente `dados-fallback.json`.
+- **Formato:** `{ "geradoEm": "<data ISO>", "lotes": [ ... ] }`. Também são aceitos o
+  formato do "⬇ Backup Externo" / e-mail semanal (`exportadoEm`, `lotes`,
+  `kitMedicoLotes`) e um array puro.
+- **Como atualizar (sem ferramenta nenhuma):** clicar em "⬇ Backup Externo" no
+  dashboard editável (ou pegar o `.json` do e-mail de backup de segunda-feira),
+  renomear o arquivo para `dados-fallback.json` e subir no GitHub por cima do antigo.
+- **Como o usuário percebe que está no plano B:** o indicador de sincronização mostra
+  "⚠ dados offline de DD/MM/AAAA" (data da cópia). Se nem o arquivo de reserva estiver
+  disponível: "⚠ sem dados (offline)".
+- **Limitação:** abrir o `.html` direto do computador (duplo clique, `file://`) faz o
+  navegador bloquear a leitura do `.json`. Não afeta o uso pelo GitHub Pages.
+- **Kit Médico não tem dado de reserva** (nunca teve): só é carregado do Supabase.
 
 ---
 
@@ -253,7 +285,24 @@ Ao clicar em "Atualizar Dashboard" (ou "Atualizar" no Kit Médico), o sistema ve
 se dois lotes ficaram com o mesmo ID na tabela. Se sim, **bloqueia o salvamento** e
 avisa qual ID está duplicado.
 
-### 6.4 Proteção contra sobrescrita simultânea
+### 6.4 Bloqueio de salvamento quando os dados não puderam ser confirmados
+
+Fecha o gap descrito na seção 10 (pendências): se o carregamento inicial dos dados
+falhar (erro do Supabase, sem conexão, exceção de rede), o Editável passa a exibir os
+dados de reserva ou o que sobrou de antes, **e bloqueia o botão de salvar** — tanto na
+Linha Principal quanto no Kit Médico, de forma independente. Aparece uma faixa
+vermelha no topo da página explicando o motivo, com um botão "🔄 Tentar novamente"
+que recarrega dos dois (sem precisar dar F5).
+
+- **Quando bloqueia:** erro do Supabase ao carregar, ou exceção (sem rede/timeout).
+- **Quando NÃO bloqueia:** carregamento com sucesso (mesmo que o banco esteja
+  genuinamente vazio — isso é um estado real confirmado, não uma incerteza).
+- **Como sai do bloqueio:** um novo carregamento bem-sucedido (via "🔄 Tentar
+  novamente" ou recarregando a página) limpa o bloqueio automaticamente.
+- **Onde no código:** variáveis `salvamentoLotesBloqueado` / `salvamentoKitBloqueado`
+  e `motivoBloqueioLotes` / `motivoBloqueioKit`; função `atualizarBannerBloqueioSalvamento()`.
+
+### 6.5 Proteção contra sobrescrita simultânea
 
 Antes de qualquer salvamento, o sistema compara um "retrato" (timestamp da última
 alteração + contagem de registros) capturado quando a página carregou com o estado
@@ -261,14 +310,14 @@ atual do servidor. Se algo mudou nesse meio-tempo (outra pessoa editando ao mesm
 tempo), aparece um aviso perguntando se a pessoa quer mesmo sobrescrever ou prefere
 recarregar a página primeiro.
 
-### 6.5 Skeleton loading
+### 6.6 Skeleton loading
 
 Nos dois dashboards, enquanto os dados carregam (ou enquanto se decide se mostra o
 login), aparece um layout "fantasma" (blocos cinza animados) em vez de tela em
 branco. Há uma salvaguarda de 8 segundos: se algo impedir o carregamento normal, o
 skeleton some sozinho, pra nunca travar a tela.
 
-### 6.6 Interface responsiva (inclusive fonte)
+### 6.7 Interface responsiva (inclusive fonte)
 
 Como praticamente todo o CSS deste projeto usa `px` fixo (não `rem`), a
 responsividade é feita escalando a página inteira via `zoom`, calculado em JS a
