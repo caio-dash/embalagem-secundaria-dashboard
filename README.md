@@ -3,7 +3,7 @@
 **Projeto:** Hemobrás — Acompanhamento de produção da linha de Embalagem Secundária
 **Repositório:** https://github.com/caio-dash/embalagem-secundaria-dashboard
 **Backend:** Supabase (projeto `jvunnfjzqqkrscjldfkf`, "Caio Duarte Project", região `us-west-2`)
-**Última atualização deste documento:** 29/09/2026
+**Última atualização deste documento:** 30/09/2026
 
 > Este documento existe para que qualquer pessoa — não só quem construiu o sistema —
 > consiga entender, manter e evoluir este dashboard. Se algo aqui ficar desatualizado
@@ -317,13 +317,13 @@ login), aparece um layout "fantasma" (blocos cinza animados) em vez de tela em
 branco. Há uma salvaguarda de 8 segundos: se algo impedir o carregamento normal, o
 skeleton some sozinho, pra nunca travar a tela.
 
-### 6.7 Interface responsiva (inclusive fonte)
+### 6.7 Interface responsiva (removida em 30/09/2026 — ver histórico de bugs, seção 8)
 
-Como praticamente todo o CSS deste projeto usa `px` fixo (não `rem`), a
-responsividade é feita escalando a página inteira via `zoom`, calculado em JS a
-partir da largura da janela (`window.innerWidth`), com 1280px como referência
-("tamanho original"). Ajusta automaticamente tanto em celular (menor) quanto em
-monitores grandes/TVs (maior).
+Existiu uma escala responsiva via CSS `zoom` (calculada em JS a partir de
+`window.innerWidth`), que **foi removida** por quebrar o funcionamento dos
+gráficos. Detalhes na seção 8. A interface voltou ao tamanho fixo original.
+Se reintroduzir responsividade no futuro, ver a ressalva técnica registrada lá
+antes de escolher a técnica.
 
 ---
 
@@ -351,6 +351,7 @@ Para adicionar um novo insumo:
 | Set/2026 | Lote excluído reaparecia ao recarregar | Botão ✕ só apagava da tela (DOM), nunca mandava `DELETE` pro Supabase — o salvamento fazia só `upsert` | Passou a rastrear IDs removidos e enviar `DELETE` explícito ao salvar |
 | Set/2026 | Mesmo depois da correção acima, exclusão continuava não persistindo | Faltava política de RLS de `DELETE` nas tabelas `lotes` e `kit_medico_lotes` — o Supabase ignorava a tentativa silenciosamente | Criadas as políticas de `DELETE` para usuários autenticados |
 | Set/2026 | Dashboard mostrava dados desatualizados (faltavam 2 lotes) | O arquivo tinha um array de dados "de fallback" desatualizado, usado antes do Supabase carregar | Dados de fallback ressincronizados com o estado atual do banco |
+| Set/2026 | Gráficos de OEE e Descarte de Insumos com exibição de dados/tendências/médias com problema; botão de liga-desliga da legenda não respondia | A interface responsiva (seção 6.7) escalava a página com CSS `zoom`. Chart.js usa `getBoundingClientRect()` para desenhar e para traduzir clique-do-mouse → item-da-legenda; existe um bug documentado e ainda presente (2024/2025) no WebKit onde `zoom` faz `getBoundingClientRect()` devolver coordenadas erradas (WebKit Bugzilla #77998 / #185034) | Escala responsiva via `zoom` removida por completo (interface voltou ao tamanho fixo). **Se reintroduzir responsividade:** não usar `zoom` em telas com Chart.js. `transform: scale()` não tem esse bug de coordenadas, mas cria um novo *containing block* para elementos `position: fixed` — quebraria o Modo TV, o skeleton loading e o painel de edição, que dependem de ficar fixos à janela real. Qualquer nova tentativa precisa: (a) escalar só contâiners sem `position: fixed` dentro, ou (b) recalcular manualmente a posição desses elementos, ou (c) usar uma técnica que não exija `transform` nem `zoom` no ancestral comum (ex.: `rem` de verdade, com CSS reescrito) |
 
 ---
 
