@@ -282,27 +282,11 @@ select.cell option { background: var(--bg3); color: var(--text); }
 </head>
 <body>
 
-<script>
-  // ─── Escala responsiva da interface (inclui a fonte) ───────────────────
-  // Quase todo o CSS deste arquivo usa px fixo (não rem), então mudar
-  // html{font-size} sozinho não teria efeito na maioria do texto. Em vez
-  // disso, escalamos a página inteira via `zoom`, que ajusta
-  // proporcionalmente tudo — inclusive fontes, respeitando o texto de cada
-  // componente sem precisar reescrever centenas de regras CSS.
-  // Referência: 1280px de largura = escala 1 (tamanho original do design).
-  // Isso deixa a interface um pouco menor em celular e maior em monitores
-  // grandes/TVs — importante especialmente para o Modo TV, visto de longe.
-  (function () {
-    function aplicarEscalaResponsiva() {
-      const largura = window.innerWidth;
-      let escala = 1 + (largura - 1280) / 1280 * 0.35;
-      escala = Math.min(Math.max(escala, 0.82), 1.85);
-      document.documentElement.style.zoom = escala;
-    }
-    aplicarEscalaResponsiva();
-    window.addEventListener('resize', aplicarEscalaResponsiva);
-  })();
-</script>
+<!-- A escala responsiva via CSS `zoom` foi removida em 30/09/2026: causava mau
+     funcionamento em gráficos (Chart.js depende de getBoundingClientRect() para
+     desenhar e detectar cliques na legenda, e `zoom` quebra essa medição em
+     alguns navegadores — bug documentado do WebKit, ainda presente em 2024/2025).
+     Ver seção 6.7 do README para o diagnóstico completo. -->
 
 <!-- ── SKELETON LOADING ── visível por padrão; some assim que os dados chegam ── -->
 <div id="skeletonOverlay">
