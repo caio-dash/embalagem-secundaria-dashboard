@@ -3,7 +3,7 @@
 **Projeto:** Hemobrás — Acompanhamento de produção da linha de Embalagem Secundária
 **Repositório:** https://github.com/caio-dash/embalagem-secundaria-dashboard
 **Backend:** Supabase (projeto `jvunnfjzqqkrscjldfkf`, "Caio Duarte Project", região `us-west-2`)
-**Última atualização deste documento:** 30/09/2026
+**Última atualização deste documento:** 30/09/2026 (Fase 2)
 
 > Este documento existe para que qualquer pessoa — não só quem construiu o sistema —
 > consiga entender, manter e evoluir este dashboard. Se algo aqui ficar desatualizado
@@ -26,14 +26,15 @@ puro, e falam diretamente com o Supabase pelo SDK `supabase-js` embutido no `<sc
 Não há build, bundler ou processo de compilação: o que está no arquivo `.html` é
 exatamente o que roda no navegador.
 
-Além dos dois HTMLs, existe um terceiro arquivo no repositório, na **mesma pasta**:
-`dados-fallback.json` — a cópia de reserva dos lotes (ver seção 3.5). Ele só é lido
-quando o Supabase não responde.
+Além dos dois HTMLs, existem mais dois arquivos no repositório, na **mesma pasta**:
+- `dados-fallback.json` — a cópia de reserva dos lotes (ver seção 3.5). Só é lido
+  quando o Supabase não responde.
+- `dashboard-core.js` — código compartilhado entre os dois HTMLs (ver seção 3.6).
+  **Sempre** é carregado por ambos; se faltar, os dois dashboards quebram.
 
-> **Composição real dos arquivos (medido em 28/09/2026):** ~43% de cada HTML é o
-> Chart.js v4.4.4 embutido de propósito (para não depender de CDN externo), ~32% é o
-> código do app, ~8% CSS/Modo TV. Os dados de lotes eram só ~6–9% — por isso separá-los
-> resolve o problema de dado desatualizado, mas não reduz o tamanho de forma relevante.
+> **Composição real dos arquivos (medido em 28/09/2026, antes da Fase 2):** ~43% de
+> cada HTML era o Chart.js v4.4.4 embutido de propósito (para não depender de CDN
+> externo), ~32% código do app, ~8% CSS/Modo TV. Os dados de lotes eram só ~6–9%.
 
 ### 1.1 Por que dois arquivos separados (não um só com controle de permissão)?
 
@@ -49,9 +50,11 @@ risco de alguém achar um jeito de habilitar edição via console do navegador).
 GitHub integrado a nenhuma ferramenta de IA usada neste projeto. Todo o processo é
 manual:
 
-1. Editar o arquivo `.html` (localmente, ou pedindo a uma IA para gerar a versão nova).
-   Se mudou **só o código**, sobe só o `.html`. Se mudou **só a cópia de reserva**,
-   sobe só o `dados-fallback.json` (ver 3.5).
+1. Editar o(s) arquivo(s) (localmente, ou pedindo a uma IA para gerar a versão nova).
+   Se mudou **código específico de uma página**, sobe só aquele `.html`. Se mudou
+   **código compartilhado**, sobe o `dashboard-core.js` (ver 3.6) — e não precisa
+   tocar nos HTMLs nesse caso. Se mudou **só a cópia de reserva**, sobe só o
+   `dados-fallback.json` (ver 3.5).
 2. No GitHub, abrir o repositório → clicar no arquivo antigo → **Edit** (ícone de
    lápis) → colar o conteúdo novo → **Commit changes**.
    - Alternativa para arquivos grandes: **Add file → Upload files**, arrastar o
@@ -121,8 +124,8 @@ direto no Supabase (adicionou/editou um lote → todo mundo já vê atualizado, 
 passo manual). O `dados-fallback.json` só é baixado se o Supabase der erro, estiver
 fora do ar, ou devolver a tabela vazia.
 
-- **Onde fica:** raiz do repositório, ao lado de `index.html` e `editar.html`. O nome
-  precisa ser exatamente `dados-fallback.json`.
+- **Onde fica:** raiz do repositório, ao lado de `index.html`, `editar.html` e
+  `dashboard-core.js`. O nome precisa ser exatamente `dados-fallback.json`.
 - **Formato:** `{ "geradoEm": "<data ISO>", "lotes": [ ... ] }`. Também são aceitos o
   formato do "⬇ Backup Externo" / e-mail semanal (`exportadoEm`, `lotes`,
   `kitMedicoLotes`) e um array puro.
@@ -135,6 +138,37 @@ fora do ar, ou devolver a tabela vazia.
 - **Limitação:** abrir o `.html` direto do computador (duplo clique, `file://`) faz o
   navegador bloquear a leitura do `.json`. Não afeta o uso pelo GitHub Pages.
 - **Kit Médico não tem dado de reserva** (nunca teve): só é carregado do Supabase.
+
+### 3.6 Código compartilhado — `dashboard-core.js` (Fase 2, 30/09/2026)
+
+Os dois dashboards compartilham muita lógica (formatação de data, paleta de cores,
+construção de gráficos). Até 30/09/2026, esse código existia **duplicado** nos dois
+HTMLs — qualquer correção precisava ser aplicada duas vezes, em dois lugares
+diferentes, e isso já causou pelo menos um caso real de "esqueci de replicar a
+correção no outro arquivo" nesta mesma base de código.
+
+A Fase 2 extraiu pra `dashboard-core.js` **só o que era 100% idêntico, byte a byte**,
+entre os dois arquivos (confirmado por comparação automatizada, não por inspeção
+visual): 20 constantes/paleta de cores/plugins do Chart.js (`clr`, `NOMES_MESES`,
+`BASE_YEAR`, `refBandPlugin`, `trendSummaryPlugin`, etc.) e 55 funções (`setChart`,
+`buildOEE`, `buildVisaoPeriodo`, `calcularTendencia`, `exportarChartCSV`, entre
+outras).
+
+- **O que FICOU local, de propósito, em cada HTML:** funções com qualquer diferença
+  de comportamento entre os dois dashboards (ex.: `applyChanges`, `showSection`,
+  `buildComparativo`, `sheetRow` — o editável tem edição, confirmação de exclusão,
+  etc., que a visualização não tem) e variáveis de estado por página (`LOTES`,
+  `KIT_LOTES`, `CHARTS`, `sb`) — cada página tem a sua própria, por design.
+- **Ordem de carregamento obrigatória:** Chart.js → `dashboard-core.js` → SDK do
+  Supabase → script da própria página. `dashboard-core.js` chama
+  `Chart.register(...)` no carregamento, então precisa vir depois do Chart.js e
+  antes de qualquer gráfico ser construído.
+- **Se precisar corrigir algo que está em `dashboard-core.js`:** a correção vale
+  para os dois dashboards automaticamente — não precisa (e não deve) copiar a mudança
+  pro HTML também.
+- **Se uma função parecida precisar de comportamento diferente nos dois
+  dashboards:** ela deve ficar FORA de `dashboard-core.js`, duplicada mesmo — colocar
+  ali só o que é (e deve continuar sendo) idêntico.
 
 ---
 
