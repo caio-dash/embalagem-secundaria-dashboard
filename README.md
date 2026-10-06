@@ -3,7 +3,7 @@
 **Projeto:** Hemobrás — Acompanhamento de produção da linha de Embalagem Secundária
 **Repositório:** https://github.com/caio-dash/embalagem-secundaria-dashboard
 **Backend:** Supabase (projeto `jvunnfjzqqkrscjldfkf`, "Caio Duarte Project", região `us-west-2`)
-**Última atualização deste documento:** 30/09/2026 (Fase 2)
+**Última atualização deste documento:** 01/10/2026
 
 > Este documento existe para que qualquer pessoa — não só quem construiu o sistema —
 > consiga entender, manter e evoluir este dashboard. Se algo aqui ficar desatualizado
@@ -389,10 +389,28 @@ Para adicionar um novo insumo:
 
 ---
 
-## 9. Checklist manual antes de publicar uma mudança
+## 9. Testes antes de publicar uma mudança
 
-Não existe suíte de testes automatizados neste projeto. Antes de subir uma alteração
-para o GitHub, rode manualmente, no arquivo baixado (localmente, antes do commit):
+### 9.1 Testes automatizados (pasta `/tests`)
+
+Desde 01/10/2026 existe uma suíte de testes de regressão em Node.js, cobrindo a
+lógica mais crítica (carregamento com Supabase fora do ar, bloqueio de salvamento).
+Rode antes de qualquer commit que toque nessas áreas:
+
+```bash
+node tests/rodar-tudo.js
+```
+
+Detalhes de cada teste, pré-requisitos e como adicionar um novo: `tests/README.md`.
+
+**O que isso cobre:** lógica pura (JS). **O que NÃO cobre:** renderização visual,
+cliques reais em gráficos, CSS, Modo TV. Para isso, o checklist manual abaixo
+continua necessário.
+
+### 9.2 Checklist manual
+
+Antes de subir uma alteração para o GitHub, rode manualmente, no arquivo baixado
+(localmente, antes do commit):
 
 - [ ] Login funciona no dashboard editável.
 - [ ] Adicionar um lote novo (com ID único) salva corretamente.
@@ -403,6 +421,9 @@ para o GitHub, rode manualmente, no arquivo baixado (localmente, antes do commit
 - [ ] Dashboard de visualização carrega os dados certos (mesma contagem de lotes que
       o editável).
 - [ ] Modo TV liga, percorre os 6 passos, e os controles (◀ ⏸ ▶ ✕) funcionam.
+- [ ] Nos gráficos de OEE e Descarte de Insumos, clicar na legenda liga/desliga a
+      série corretamente (verificação específica após o incidente de 30/09/2026 —
+      ver seção 8).
 - [ ] Nenhum erro aparece no Console do navegador (F12 → Console) durante o uso
       normal.
 
@@ -440,6 +461,7 @@ para o GitHub, rode manualmente, no arquivo baixado (localmente, antes do commit
 - **Workflow agendado (GitHub Actions, fora do Supabase):**
   - `.github/workflows/keep-alive.yml` — `0 12 */3 * *` (a cada 3 dias)
 - **Serviço de e-mail:** Resend (resend.com)
+- **Testes automatizados:** pasta `/tests` (ver seção 9.1 e `tests/README.md`)
 - **Segredos usados (Supabase → Edge Functions → Secrets):** `RESEND_API_KEY`,
   `CRON_SECRET`
 - **Segredos usados (GitHub → Settings → Secrets → Actions):** `CRON_SECRET` (mesmo
