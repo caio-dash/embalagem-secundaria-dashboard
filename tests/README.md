@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/33117519/README.md)
 # Testes automatizados — Dashboard Embalagem Secundária
 
 Testes de regressão para a lógica crítica dos dois dashboards. Rodam em Node.js puro
@@ -20,13 +19,14 @@ Da raiz do repositório (onde ficam `index.html`, `editar.html`, `dashboard-core
 node tests/rodar-tudo.js
 ```
 
-Isso roda os três arquivos de teste em sequência e mostra um resumo no final. Para
+Isso roda todos os arquivos de teste em sequência e mostra um resumo no final. Para
 rodar um teste específico (mais rápido, ao mexer em só uma parte do código):
 
 ```bash
 node tests/teste-dados-fallback.js
 node tests/teste-bloqueio-salvamento.js
 node tests/teste-bloqueio-kit-medico.js
+node tests/teste-lotes-historico.js
 ```
 
 Funciona tanto rodando da raiz do repositório quanto de dentro da própria pasta
@@ -40,6 +40,7 @@ diretório de onde o comando foi chamado.
 | `teste-dados-fallback.js` | Carregamento de dados: Supabase OK, erro, sem rede, banco vazio, arquivo `dados-fallback.json` ausente/em formatos diferentes, ordem de inicialização do dashboard | 9 cenários × 2 arquivos (Visualização e Editável) |
 | `teste-bloqueio-salvamento.js` | Bloqueio do botão de salvar quando o estado do Supabase não pôde ser confirmado ao carregar (Linha Principal) | 5 cenários |
 | `teste-bloqueio-kit-medico.js` | Mesmo bloqueio, mas para o Kit Médico (carrega/salva de forma independente da Linha Principal) | 3 cenários |
+| `teste-lotes-historico.js` | Lotes arquivados (`lotes_historico`, ver seção 3.7 do README principal): soma com `lotes` ao carregar (nos dois dashboards), marcação `_historico`, e roteamento de gravação/exclusão pela tabela certa conforme a conta logada | 6 cenários |
 
 ## O que isso NÃO substitui
 
