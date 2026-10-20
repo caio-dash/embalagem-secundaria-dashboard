@@ -209,7 +209,7 @@ select.cell option { background: var(--bg3); color: var(--text); }
 .chart-zoom-title { font-size: 16px; font-weight: 600; color: var(--text); }
 .chart-zoom-body { flex: 1; min-height: 420px; position: relative; }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3"></script> <!-- versão travada em 13/10/2026 — ver seção 3.8 do README antes de atualizar -->
 <style>
 /* ── AUTENTICAÇÃO ─────────────────────────────────────── */
 
@@ -2679,6 +2679,22 @@ async function carregarLotes() {
     if (!error && data && data.length > 0) {
       LOTES = data.map(r => r.dados).filter(Boolean);
       carregouDoSupabase = true;
+
+      // lotes_historico guarda os anos já arquivados pela virada de ano (ver
+      // arquivar_lotes_ano_anterior() no Supabase) — somamos aqui pra nenhum
+      // gráfico/filtro perder dados de anos anteriores só porque foram movidos
+      // de tabela. Isolado em try/catch: se a tabela não existir (ambiente
+      // antigo) ou a consulta falhar, o dashboard segue normalmente só com
+      // os lotes do ano corrente.
+      try {
+        const { data: dataHist, error: errHist } = await sb.from('lotes_historico').select('*');
+        if (!errHist && dataHist && dataHist.length) {
+          LOTES = LOTES.concat(dataHist.map(r => r.dados).filter(Boolean));
+        }
+      } catch (eHist) {
+        console.warn('lotes_historico indisponível:', eHist);
+      }
+
       setSyncStatus('✓ ' + LOTES.length + ' lotes · ' + new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}), 'var(--green2)');
     }
   } catch(e) {
