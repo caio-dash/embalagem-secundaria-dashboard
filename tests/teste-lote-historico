@@ -1,0 +1,179 @@
+// Testa o CÓDIGO REAL extraído dos dois HTMLs para o recurso de arquivamento
+// em lotes_historico: (1) leitura — lotes + lotes_historico são somados ao
+// carregar, sem perder dados de anos arquivados; (2) gravação — lotes normais
+// vão para 'lotes', lotes marcados com _historico:true só vão para
+// 'lotes_historico', e só quando é a conta administradora quem está logada.
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const RAIZ = path.join(__dirname, '..');
+
+const CORE = fs.readFileSync(path.join(RAIZ, 'dashboard-core.js'), 'utf-8');
+
+function extrairTrecho(arquivo, inicioMarca, fimMarca) {
+  const html = fs.readFileSync(path.join(RAIZ, arquivo), 'utf-8');
+  const a = html.indexOf(inicioMarca);
+  const b = html.indexOf(fimMarca, a);
+  if (a < 0 || b < 0) throw new Error(`marcador não encontrado em ${arquivo}: "${(a<0?inicioMarca:fimMarca)}"`);
+  return html.slice(a, b);
+}
+
+let falhas = 0;
+function confere(nome, condicao, detalhe) {
+  console.log((condicao ? '  ✓ ' : '  ✗ FALHOU: ') + nome + (condicao ? '' : '  → ' + JSON.stringify(detalhe)));
+  if (!condicao) falhas++;
+}
+
+// ───────────────────────── 1) LEITURA — VISUALIZAÇÃO ─────────────────────────
+async function rodarCargaViz(sbStub) {
+  const codigo = CORE + '\n' + extrairTrecho('index.html', 'async function carregarLotes() {', '\n\n\n// Salvaguarda');
+  const ctx = {
+    Chart: { register: () => {} },
+    console: { warn(){}, error(){}, log(){} },
+    setSyncStatus: () => {},
+    parsePeriodo: () => true, // função não-compartilhada (26 diferentes); stub mínimo só pra sortLotesCronologico (do core) não quebrar
+    document: { getElementById: () => null }, // esconderSkeletonLoading (do core) só precisa não quebrar
+    initDashboard: () => {},
+    carregarKitLotesSupabase: () => {},
+    carregarDadosFallback: async () => ({ carregou: false }),
+    textoStatusFallback: () => '',
+    sb: sbStub,
+    Date, Array, JSON,
+  };
+  ctx.LOTES = [];
+  vm.createContext(ctx);
+  vm.runInContext(codigo, ctx);
+  await vm.runInContext('carregarLotes()', ctx);
+  return ctx.LOTES;
+}
+
+// ─────────────────────── 1b) LEITURA — EDITÁVEL ──────────────────────────────
+async function rodarCargaEdit(sbStub) {
+  const codigo = CORE + '\n' + extrairTrecho('editar.html', 'async function carregarLotesSupabase() {', 'if (sb) sb.auth.onAuthStateChange(');
+  const ctx = {
+    Chart: { register: () => {} },
+    console: { warn(){}, error(){}, log(){} },
+    setSyncStatus: () => {},
+    atualizarSnapshotLotesDe: () => {},
+    atualizarBannerBloqueioSalvamento: () => {},
+    carregarDadosFallback: async () => ({ carregou: false }),
+    textoStatusFallback: () => '',
+    salvarLotesSupabase: async () => {},
+    sb: sbStub,
+    Date, Array, JSON,
+  };
+  ctx.LOTES = [];
+  ctx.salvamentoLotesBloqueado = false;
+  ctx.motivoBloqueioLotes = '';
+  vm.createContext(ctx);
+  vm.runInContext(codigo, ctx);
+  await vm.runInContext('carregarLotesSupabase()', ctx);
+  return ctx.LOTES;
+}
+
+// loteA/loteB = ano corrente (tabela lotes); loteC = arquivado (lotes_historico)
+const loteA = { id: 'A1', per: '01-05/mar', mes: 'Mar/26' };
+const loteB = { id: 'B1', per: '06-10/mar', mes: 'Mar/26' };
+const loteC = { id: 'C1', per: '01-05/jan', mes: 'Jan/25' };
+
+// sb.from('lotes_historico').select('*') é usado SEM .order() nos dois arquivos.
+function sbComHistoricoReal({ lotesData = [loteA, loteB], historicoData = [loteC], historicoFalha = false } = {}) {
+  return {
+    from: (tabela) => {
+      if (tabela === 'lotes') {
+        return { select: () => ({ order: async () => ({ data: lotesData.map(d => ({ dados: d, updated_at: '2026-01-01' })), error: null }) }) };
+      }
+      if (tabela === 'lotes_historico') {
+        return { select: async () => historicoFalha
+          ? { data: null, error: { message: 'tabela indisponível' } }
+          : { data: historicoData.map(d => ({ dados: d, updated_at: '2025-12-31' })), error: null } };
+      }
+      throw new Error('tabela inesperada: ' + tabela);
+    },
+  };
+}
+
+// ───────────────────────────── 2) GRAVAÇÃO — EDITÁVEL ────────────────────────
+async function rodarSalvar({ lotes, currentUserEmail, idsLotesParaExcluir = [], idsHistoricoParaExcluir = [] }) {
+  const codigo = extrairTrecho('editar.html', 'async function criarBackup(tabela) {', 'async function registrarAuditoria(');
+  const chamadas = { upsert: [], delete: [] };
+  const sbStub = {
+    auth: { getSession: async () => ({ data: { session: { user: {} } } }) },
+  };
+  // criarBackup faz sb.from(tabela).select('*') esperando {data,error}
+  sbStub.from = (tabela) => ({
+    select: async () => ({ data: [], error: null }), // criarBackup: sem dados, só não quebra
+    upsert: async (rows) => { chamadas.upsert.push({ tabela, rows }); return { error: null }; },
+    delete: () => ({ in: async (col, ids) => { chamadas.delete.push({ tabela, ids }); return { error: null }; } }),
+    insert: async () => ({ error: null }),
+  });
+
+  const ctx = {
+    console: { warn(){}, error(){}, log(){} },
+    setSyncStatus: () => {},
+    sb: sbStub,
+    LOTES: lotes,
+    ADMIN_EMAIL: 'caiosdd@gmail.com',
+    currentUserEmail,
+    salvamentoLotesBloqueado: false,
+    motivoBloqueioLotes: '',
+    idsLotesParaExcluir,
+    idsHistoricoParaExcluir,
+    snapshotLotes: { maxUpdatedAt: null, count: null },
+    Date, Array, JSON, Set, Math,
+  };
+  vm.createContext(ctx);
+  vm.runInContext(codigo, ctx);
+  await vm.runInContext('salvarLotesSupabase(true)', ctx); // silencioso:true — pula confirm()/conflito
+  return chamadas;
+}
+
+(async () => {
+  console.log('\n══════ LEITURA: soma lotes + lotes_historico ══════');
+
+  let r = await rodarCargaViz(sbComHistoricoReal());
+  console.log('1) Visualização — Supabase com lotes + histórico');
+  confere('junta os 2 lotes correntes + 1 arquivado (3 no total)', r.length === 3, r.length);
+  confere('mantém os dados do lote arquivado', r.some(l => l.id === 'C1'), r.map(l=>l.id));
+
+  r = await rodarCargaViz(sbComHistoricoReal({ historicoFalha: true }));
+  console.log('2) Visualização — lotes_historico indisponível (degrada sem quebrar)');
+  confere('mantém só os 2 lotes correntes, sem travar', r.length === 2, r.length);
+
+  r = await rodarCargaEdit(sbComHistoricoReal());
+  console.log('3) Editável — Supabase com lotes + histórico');
+  confere('junta os 2 lotes correntes + 1 arquivado (3 no total)', r.length === 3, r.length);
+  const arquivado = r.find(l => l.id === 'C1');
+  confere('lote arquivado vem marcado com _historico:true', !!arquivado && arquivado._historico === true, arquivado);
+  const corrente = r.find(l => l.id === 'A1');
+  confere('lote corrente NÃO vem marcado com _historico', !!corrente && !corrente._historico, corrente);
+
+  console.log('\n══════ GRAVAÇÃO: envia cada lote para a tabela certa ══════');
+
+  const loteNormal = { id: 'N1', per: '01-05/mar', mes: 'Mar/26' };
+  const loteHist = { id: 'H1', per: '01-05/jan', mes: 'Jan/25', _historico: true };
+
+  let c = await rodarSalvar({ lotes: [loteNormal, loteHist], currentUserEmail: 'caiosdd@gmail.com' });
+  console.log('4) Administradora logada, salva lote normal + lote de histórico');
+  const upLotes = c.upsert.find(u => u.tabela === 'lotes');
+  const upHist = c.upsert.find(u => u.tabela === 'lotes_historico');
+  confere('upsert em "lotes" tem só o lote normal', upLotes && upLotes.rows.length === 1 && upLotes.rows[0].id === 'N1', upLotes);
+  confere('upsert em "lotes_historico" tem só o lote arquivado', upHist && upHist.rows.length === 1 && upHist.rows[0].id === 'H1', upHist);
+  confere('a flag _historico NUNCA é gravada dentro de "dados"', upHist && upHist.rows[0].dados._historico === undefined, upHist && upHist.rows[0].dados);
+
+  c = await rodarSalvar({ lotes: [loteNormal, loteHist], currentUserEmail: 'outra.pessoa@hemobras.gov.br' });
+  console.log('5) Outra conta logada (não-admin): NÃO tenta gravar em lotes_historico');
+  const tentouHist = c.upsert.some(u => u.tabela === 'lotes_historico');
+  confere('não chama upsert em "lotes_historico" (RLS recusaria mesmo)', !tentouHist, c.upsert.map(u=>u.tabela));
+  const upLotes2 = c.upsert.find(u => u.tabela === 'lotes');
+  confere('ainda assim salva o lote normal normalmente', upLotes2 && upLotes2.rows.length === 1 && upLotes2.rows[0].id === 'N1', upLotes2);
+
+  c = await rodarSalvar({ lotes: [loteNormal], currentUserEmail: 'caiosdd@gmail.com', idsHistoricoParaExcluir: ['H2'] });
+  console.log('6) Exclusão de lote de histórico (sem nenhum lote de histórico restante na tela)');
+  const delHist = c.delete.find(d => d.tabela === 'lotes_historico');
+  confere('exclui o ID pendente em "lotes_historico"', !!delHist, c.delete);
+  if (delHist) confere('exclui exatamente o ID H2', JSON.stringify(delHist.ids) === JSON.stringify(['H2']), delHist.ids);
+
+  console.log('\n' + (falhas === 0 ? '✅ TODOS OS TESTES PASSARAM' : '❌ ' + falhas + ' FALHA(S)'));
+  process.exit(falhas === 0 ? 0 : 1);
+})();
