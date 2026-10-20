@@ -60,6 +60,9 @@ function novoContexto(sb) {
     textoStatusFallback: () => 'sem dados (offline)',
     salvarLotesSupabase: undefined, // será a função real extraída; evita erro se referenciada antes
     idsLotesParaExcluir: [],
+    idsHistoricoParaExcluir: [], // lotes_historico (ver teste-lotes-historico.js) — não é o foco deste teste
+    currentUserEmail: null,
+    ADMIN_EMAIL: 'caiosdd@gmail.com',
     fetch: async () => ({ ok: false, status: 404, json: async () => ({}) }), // sem dados-fallback.json neste teste
     document: {
       getElementById: (id) => ({
