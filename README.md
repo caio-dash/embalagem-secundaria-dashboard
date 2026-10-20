@@ -170,6 +170,64 @@ outras).
   dashboards:** ela deve ficar FORA de `dashboard-core.js`, duplicada mesmo — colocar
   ali só o que é (e deve continuar sendo) idêntico.
 
+### 3.7 Lotes arquivados — `lotes_historico` (13/10/2026)
+
+A tabela `lotes` cresce indefinidamente (um registro por lote, pra sempre), o que no
+longo prazo pesa nas consultas e na tela de edição. A partir de 13/10/2026, na virada
+de cada ano, os lotes do ano anterior são movidos automaticamente para uma segunda
+tabela, `lotes_historico` — mesma estrutura (`id`, `dados` jsonb, `updated_at`), só que
+com uma política de escrita mais restrita.
+
+- **Quando roda:** função `arquivar_lotes_ano_anterior()`, agendada via `pg_cron`
+  (`0 4 2 1 *` — todo dia 2 de janeiro, 04h) como o job `arquivar-lotes-ano-anterior`.
+  Ela move (não copia) para `lotes_historico` todo lote de `lotes` cujo ano (extraído
+  do campo `mes`, formato `Mês/AA`) seja anterior ao ano corrente.
+- **RLS de `lotes_historico`:**
+
+  | SELECT | INSERT/UPDATE/DELETE |
+  |---|---|
+  | Público (igual à tabela `lotes`) | Só a conta `caiosdd@gmail.com` (UID `0bcea836-bd19-461f-a220-42160cf867e2`), via `auth.uid() = '...'` nas políticas |
+
+  Ou seja: qualquer pessoa autenticada no dashboard editável continua **vendo** os
+  lotes arquivados, mas só essa conta específica consegue alterá-los ou excluí-los —
+  tentativas de outras contas são recusadas pelo banco mesmo que, por algum bug futuro,
+  a tela não bloqueie o campo primeiro.
+- **Os gráficos não perdem dados arquivados.** Os dois dashboards (`carregarLotes()` em
+  `index.html`, `carregarLotesSupabase()` em `editar.html`) buscam `lotes` **e**
+  `lotes_historico` ao carregar e somam os dois conjuntos antes de montar qualquer
+  gráfico/filtro. Essa segunda busca é isolada em `try/catch`: se a tabela não existir
+  (ambiente antigo) ou a consulta falhar, o dashboard segue normalmente só com os
+  lotes do ano corrente, sem travar.
+- **Edição no dashboard editável:** ao carregar, cada lote vindo de `lotes_historico`
+  recebe a marca `_historico: true` (só em memória — nunca é gravada dentro do JSON
+  salvo). A planilha (`sheetRow`) usa essa marca pra travar os campos — e o botão
+  "✕" — dessas linhas para qualquer conta que não seja a administradora, com um ícone
+  🔒 e fundo diferenciado. Para a administradora, a linha continua totalmente editável.
+  Ao salvar (`salvarLotesSupabase`), os lotes são separados pela marca: os normais vão
+  para `lotes` como sempre; os arquivados só são enviados para `lotes_historico`
+  (upsert/delete) quando é a administradora quem está logada — evita uma chamada que a
+  RLS recusaria de qualquer forma.
+- **Kit Médico não é afetado.** Este arquivamento vale só para a linha principal
+  (tabela `lotes`) — `kit_medico_lotes` continua crescendo sem arquivamento (volume bem
+  menor, não é um problema hoje).
+- **Testado com:** `tests/teste-lotes-historico.js` (ver seção 9.1) e, manualmente,
+  com um lote de teste inserido/arquivado/removido no Supabase antes de liberar a
+  função — confirmando que os 27 lotes reais de 2026 permaneceram intocados.
+
+### 3.8 Versão do SDK do Supabase (travada)
+
+As duas páginas carregam o SDK do Supabase via CDN (jsDelivr) com a versão travada
+num número exato (ex.: `@supabase/supabase-js@2.117.3`), em vez de `@2` (que sempre
+pega a versão mais nova publicada). Isso evita que uma atualização do SDK, publicada
+sem aviso pela Supabase, mude de comportamento ou quebre algo no dashboard em produção
+sem que nenhuma mudança tenha sido feita no código deste repositório.
+
+- **Como atualizar de propósito:** trocar o número da versão no `<script src=...>` dos
+  dois arquivos (`index.html` e `editar.html` — precisa ser igual nos dois), testar
+  localmente, e só então publicar.
+- **Como não esquecer:** o comentário ao lado da tag `<script>` guarda a data em que a
+  versão foi travada e aponta pra esta seção.
+
 ---
 
 ## 4. Backups — as 3 camadas de proteção
@@ -440,8 +498,10 @@ Antes de subir uma alteração para o GitHub, rode manualmente, no arquivo baixa
 - [ ] Não existe tela de restauração para os snapshots da camada 2
       (`backups_externos`) — hoje só é possível via SQL direto no Supabase.
 - [ ] Sem MFA (autenticação em duas etapas) para os usuários que editam.
-- [ ] Sem diferenciação de papéis entre usuários autenticados (todo mundo que loga
-      tem o mesmo nível de permissão).
+- [ ] Sem diferenciação de papéis entre usuários autenticados de forma geral — a
+      única exceção hoje é `lotes_historico` (seção 3.7), restrita por RLS a uma
+      única conta. Outras áreas continuam com o mesmo nível de permissão para
+      qualquer conta autenticada.
 - [ ] Sem alertas proativos (ex.: e-mail automático se o OEE cair abaixo de um
       limite) — hoje alguém precisa abrir o dashboard pra perceber.
 
@@ -451,13 +511,15 @@ Antes de subir uma alteração para o GitHub, rode manualmente, no arquivo baixa
 
 - **Projeto Supabase:** `jvunnfjzqqkrscjldfkf`
 - **Repositório GitHub:** `caio-dash/embalagem-secundaria-dashboard`
-- **Tabelas:** `lotes`, `kit_medico_lotes`, `backups`, `backups_externos`,
-  `system_heartbeat`
+- **Tabelas:** `lotes`, `lotes_historico`, `kit_medico_lotes`, `backups`,
+  `backups_externos`, `backup_status`, `auditoria`, `system_heartbeat`
 - **Extensões Postgres usadas:** `pg_cron`, `pg_net`
-- **Edge Functions:** `backup-semanal-email`, `keep-alive`
+- **Edge Functions:** `backup-semanal-email`, `keep-alive`, `alerta-falha-backup`
 - **Jobs agendados (`pg_cron`, dentro do Supabase):**
   - `backup-diario-embalagem-secundaria` — `0 3 * * *`
   - `backup-semanal-email-embalagem-secundaria` — `0 7 * * 1`
+  - `arquivar-lotes-ano-anterior` — `0 4 2 1 *` (seção 3.7)
+- **SDK do Supabase (JS):** versão travada — ver seção 3.8
 - **Workflow agendado (GitHub Actions, fora do Supabase):**
   - `.github/workflows/keep-alive.yml` — `0 12 */3 * *` (a cada 3 dias)
 - **Serviço de e-mail:** Resend (resend.com)
