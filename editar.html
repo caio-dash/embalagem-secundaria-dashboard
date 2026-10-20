@@ -184,6 +184,10 @@ select.cell option { background: var(--bg3); color: var(--text); }
 .row-edit { min-width:28px; background:transparent; border:none; color:var(--blue); font-size:13px; cursor:pointer; padding:6px 8px; border-radius:6px; transition: background .15s; margin-right:2px; }
 .row-edit:hover { background: rgba(79,142,247,0.14); }
 
+/* Linha arquivada em lotes_historico, exibida como somente-leitura para quem não é o administrador */
+.linha-historico { background: rgba(245,166,35,0.05) !important; }
+.linha-historico input, .linha-historico select, .linha-historico textarea { opacity: 0.7; cursor: not-allowed; }
+
 /* PAINEL DE EDIÇÃO FOCADA (1 lote por vez) */
 .painel-edicao-overlay {
   position: fixed; inset: 0; z-index: 20000;
@@ -268,7 +272,7 @@ select.cell option { background: var(--bg3); color: var(--text); }
 .chart-zoom-title { font-size: 16px; font-weight: 600; color: var(--text); }
 .chart-zoom-body { flex: 1; min-height: 420px; position: relative; }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3"></script> <!-- versão travada em 13/10/2026 — ver seção 3.8 do README antes de atualizar -->
 <style>
 /* ── AUTENTICAÇÃO ─────────────────────────────────────── */
 #authOverlay {
@@ -2482,6 +2486,21 @@ function sheetRow(l, idx) {
   perInput.addEventListener('change', () => autoPreencherLinha(tr));
   perInput.addEventListener('blur', () => autoPreencherLinha(tr));
 
+  // Lote arquivado em lotes_historico: a RLS do banco só permite gravar/excluir
+  // esses registros pela conta administradora. Travamos os campos aqui também
+  // (não só no servidor) pra ficar claro na hora, em vez de um salvamento que
+  // silenciosamente não vai pegar para essas linhas.
+  if (l._historico && (!currentUserEmail || currentUserEmail.toLowerCase() !== ADMIN_EMAIL)) {
+    [tr, trIns, trDias].forEach(linha => {
+      linha.classList.add('linha-historico');
+      linha.querySelectorAll('input, select, textarea, button.row-del').forEach(el => { el.disabled = true; });
+    });
+    const campoId = tr.querySelector('.f-id');
+    if (campoId) {
+      campoId.insertAdjacentHTML('afterend', '<span title="Lote arquivado no histórico — somente leitura" style="margin-left:4px;font-size:12px">🔒</span>');
+    }
+  }
+
   return [tr, trIns, trDias];
 }
 
@@ -2526,6 +2545,9 @@ function addSheetRow() {
 // IDs de lotes removidos na tela (via botão ✕) que ainda precisam ser excluídos
 // do Supabase no próximo "Atualizar Dashboard" — ver salvarLotesSupabase().
 let idsLotesParaExcluir = [];
+// Mesma coisa, mas para lotes de lotes_historico (marcados com _historico:true) —
+// mantidos à parte porque vão para uma tabela diferente ao excluir de fato.
+let idsHistoricoParaExcluir = [];
 
 // ─── Painel de edição focada (1 lote por vez) ──────────────────────────
 // Em vez de editar direto na grade densa, move os campos do lote clicado
@@ -2626,6 +2648,14 @@ function removerLinhaLote(btn) {
   const trPrincipal = btn.closest('tr');
   if (!trPrincipal) return;
 
+  const idxAtual = trPrincipal.dataset.idx;
+  const loteAtual = idxAtual !== undefined && idxAtual !== 'new' ? LOTES[idxAtual] : null;
+  const ehHistorico = !!(loteAtual && loteAtual._historico);
+  if (ehHistorico && (!currentUserEmail || currentUserEmail.toLowerCase() !== ADMIN_EMAIL)) {
+    alert('Este lote está arquivado no histórico — apenas a conta administradora pode excluí-lo.');
+    return;
+  }
+
   const idInput = trPrincipal.querySelector('.f-id');
   const idLote = idInput ? idInput.value.trim() : '';
 
@@ -2636,8 +2666,12 @@ function removerLinhaLote(btn) {
   );
   if (!confirmado) return;
 
-  // Guarda o ID do lote para excluir de fato no Supabase ao salvar
-  if (idLote) idsLotesParaExcluir.push(idLote);
+  // Guarda o ID do lote para excluir de fato no Supabase ao salvar — na tabela
+  // certa, conforme a origem (lotes_historico vai para idsHistoricoParaExcluir).
+  if (idLote) {
+    if (ehHistorico) idsHistoricoParaExcluir.push(idLote);
+    else idsLotesParaExcluir.push(idLote);
+  }
 
   // Remove todas as sub-linhas associadas (ins-row e dias-row) antes da próxima linha principal
   let next = trPrincipal.nextElementSibling;
@@ -2732,8 +2766,15 @@ function applyChanges() {
       }
     }
 
+    // Preserva a origem do lote (lotes_historico x lotes normal) — sem isso, salvar
+    // depois de editar qualquer linha faria um lote arquivado "voltar" para a tabela
+    // 'lotes' como se fosse novo. Ver sheetRow() (onde a classe é aplicada na linha)
+    // e salvarLotesSupabase() (onde a flag decide o destino da gravação).
+    const ehHistorico = tr.classList.contains('linha-historico');
+
     novosLotes.push({ id, per, mes, q, dias, plan, prod, desc, tEstE4, tRealE4a, pnp, oee, desvAb, desvAtras, diarios,
-      conc, op, insumos: hasInsumos ? insumos : null, obs: obs || undefined });
+      conc, op, insumos: hasInsumos ? insumos : null, obs: obs || undefined,
+      ...(ehHistorico ? { _historico: true } : {}) });
   });
 
   // Validação: impede salvar se houver IDs de lote duplicados na tabela —
@@ -4132,7 +4173,23 @@ async function carregarLotesSupabase() {
       motivoBloqueioLotes = error.message;
     } else if (data && data.length > 0) {
       LOTES = data.map(row => row.dados).filter(Boolean);
-      atualizarSnapshotLotesDe(data);
+      atualizarSnapshotLotesDe(data); // baseado só na tabela 'lotes' — o histórico tem seu próprio controle de gravação (RLS), não entra na checagem de conflito
+
+      // lotes_historico guarda os anos já arquivados pela virada de ano (ver
+      // arquivar_lotes_ano_anterior() no Supabase). Somamos aqui pra nenhum
+      // gráfico/filtro perder dados de anos anteriores só porque foram movidos
+      // de tabela, e marcamos cada um com _historico:true (só em memória, nunca
+      // gravado) pra planilha saber que esse lote só pode ser editado/excluído
+      // pela conta administradora (ver sheetRow/removerLinhaLote/salvarLotesSupabase).
+      try {
+        const { data: dataHist, error: errHist } = await sb.from('lotes_historico').select('*');
+        if (!errHist && dataHist && dataHist.length) {
+          LOTES = LOTES.concat(dataHist.map(r => r.dados ? { ...r.dados, _historico: true } : null).filter(Boolean));
+        }
+      } catch (eHist) {
+        console.warn('lotes_historico indisponível:', eHist);
+      }
+
       setSyncStatus('✓ ' + LOTES.length + ' lotes · ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}), 'var(--green2)');
       salvamentoLotesBloqueado = false;
     } else {
@@ -4305,8 +4362,14 @@ async function salvarLotesSupabase(silencioso) {
 
   await criarBackup('lotes'); // backup automático do estado atual, antes de sobrescrever
 
+  // Lotes vindos de lotes_historico (marcados com _historico:true ao carregar) vão
+  // para uma tabela separada — ver carregarLotesSupabase(). Tudo o que sobra é o
+  // conjunto normal, que continua indo para 'lotes' como sempre.
+  const lotesNormais = LOTES.filter(l => !l._historico);
+  const lotesHistoricoLocal = LOTES.filter(l => l._historico);
+
   // Upsert: insere ou atualiza cada lote pelo id
-  const rows = LOTES.map(l => ({
+  const rows = lotesNormais.map(l => ({
     id: l.id || ('novo_' + Date.now() + '_' + Math.random().toString(36).slice(2,6)),
     dados: l,
     updated_at: new Date().toISOString()
@@ -4322,7 +4385,7 @@ async function salvarLotesSupabase(silencioso) {
   // Exclui de fato, no Supabase, os lotes removidos na tela (botão ✕).
   // Sem isso, o upsert acima nunca apaga uma linha que sumiu do LOTES —
   // ele só insere/atualiza — e o lote "excluído" reaparece ao recarregar.
-  const idsAtuais = new Set(LOTES.map(l => l.id).filter(Boolean));
+  const idsAtuais = new Set(lotesNormais.map(l => l.id).filter(Boolean));
   const idsParaExcluirAgora = [...new Set(idsLotesParaExcluir)].filter(id => !idsAtuais.has(id));
   if (idsParaExcluirAgora.length) {
     const { error: errDel } = await sb.from('lotes').delete().in('id', idsParaExcluirAgora);
@@ -4334,9 +4397,43 @@ async function salvarLotesSupabase(silencioso) {
     idsLotesParaExcluir = [];
   }
 
+  // Lotes arquivados em lotes_historico: a RLS dessa tabela só permite gravar ou
+  // excluir pela conta administradora (ver criar_lotes_historico no Supabase).
+  // Para qualquer outra conta esses campos já ficam travados na tela (sheetRow),
+  // então aqui só tentamos a escrita quando é a administradora quem está logada —
+  // evita uma chamada que já sabemos que a RLS vai recusar. A exclusão roda
+  // independente de sobrar algum lote de histórico na tela (senão excluir o
+  // ÚLTIMO lote arquivado visível nunca chegaria a ser enviado ao banco).
+  if (currentUserEmail && currentUserEmail.toLowerCase() === ADMIN_EMAIL) {
+    if (lotesHistoricoLocal.length) {
+      const rowsHist = lotesHistoricoLocal.map(l => {
+        const { _historico, ...dadosLimpos } = l; // nunca grava a flag _historico dentro do JSON
+        return { id: l.id, dados: dadosLimpos, updated_at: new Date().toISOString() };
+      });
+      const { error: errHist } = await sb.from('lotes_historico').upsert(rowsHist, { onConflict: 'id' });
+      if (errHist) {
+        console.error('Supabase save error (histórico):', errHist);
+        setSyncStatus('⚠ erro ao salvar histórico', '#ef4444');
+        return;
+      }
+    }
+    const idsHistAtuais = new Set(lotesHistoricoLocal.map(l => l.id).filter(Boolean));
+    const idsHistParaExcluirAgora = [...new Set(idsHistoricoParaExcluir)].filter(id => !idsHistAtuais.has(id));
+    if (idsHistParaExcluirAgora.length) {
+      const { error: errDelHist } = await sb.from('lotes_historico').delete().in('id', idsHistParaExcluirAgora);
+      if (errDelHist) {
+        console.error('Supabase delete error (histórico):', errDelHist);
+        setSyncStatus('⚠ erro ao excluir do histórico', '#ef4444');
+        return;
+      }
+      idsHistoricoParaExcluir = [];
+    }
+  }
+
   // Atualiza o snapshot: a partir de agora, ESTA gravação passa a ser a mais recente conhecida
+  // (baseado só em 'lotes' — é a mesma tabela que existeConflitoDeEdicaoLotes() verifica)
   const agoraISO = rows[0]?.updated_at || new Date().toISOString();
-  snapshotLotes = { maxUpdatedAt: agoraISO, count: LOTES.length };
+  snapshotLotes = { maxUpdatedAt: agoraISO, count: lotesNormais.length };
 
   setSyncStatus('✓ salvo na nuvem · ' + new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }), 'var(--green2)');
 }
